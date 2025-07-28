@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:petty_cash_app/main.dart';
 
 class AddBillPage extends StatefulWidget {
   const AddBillPage({super.key});
@@ -15,7 +17,7 @@ class AddBillPage extends StatefulWidget {
 }
 
 class _AddBillPageState extends State<AddBillPage> {
-  final _formKey = GlobalKey<FormState>(); // Ensure proper typing
+  final _formKey = GlobalKey<FormState>();
   final _narrationController = TextEditingController();
   final _amountController = TextEditingController();
   String? _expenseHead;
@@ -31,19 +33,27 @@ class _AddBillPageState extends State<AddBillPage> {
 
   Future<void> _fetchExpenseHeads() async {
     final url = Uri.parse("https://stage-cash.fesf-it.com/api/expense-heads");
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
     try {
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token', // Include token in header
+        },
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         setState(() {
           _expenseHeads = data.map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']}).toList();
         });
       } else {
-        throw Exception('Failed to load expense heads');
+        throw Exception('Failed to load expense heads: ${response.statusCode}');
       }
     } catch (e) {
       ScaffoldMessenger.of(kontxt()).showSnackBar(
-        SnackBar(content: Text('Error loading expense heads: $e')),
+        SnackBar(content: Text('Error loading expense heads: $e', style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)))),
       );
     }
   }
@@ -58,15 +68,24 @@ class _AddBillPageState extends State<AddBillPage> {
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
-          title: Text('Select Image Source', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w500)),
+          title: Text(
+            'Select Image Source',
+            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500),
+          ),
           children: [
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, ImageSource.gallery),
-              child: Text('Gallery', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+              child: Text(
+                'Gallery',
+                style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+              ),
             ),
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, ImageSource.camera),
-              child: Text('Camera', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+              child: Text(
+                'Camera',
+                style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+              ),
             ),
           ],
         );
@@ -139,6 +158,9 @@ class _AddBillPageState extends State<AddBillPage> {
             primaryColor: Colors.deepPurple,
             colorScheme: const ColorScheme.light(primary: Colors.deepPurple),
             buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            textTheme: TextTheme(
+              bodyLarge: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+            ),
           ),
           child: child!,
         );
@@ -176,32 +198,47 @@ class _AddBillPageState extends State<AddBillPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add Bill', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Add Bill',
+          style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w600),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
-          key: _formKey, // Ensure the key is correctly applied
+          key: _formKey,
           child: ListView(
             children: [
               TextFormField(
                 controller: _narrationController,
-                decoration: InputDecoration(labelText: 'Narration', labelStyle: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                decoration: InputDecoration(
+                  labelText: 'Narration',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 validator: (value) => value!.isEmpty ? 'Please enter narration' : null,
               ),
               TextFormField(
                 controller: _amountController,
-                decoration: InputDecoration(labelText: 'Amount', labelStyle: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Please enter amount' : null,
               ),
               DropdownButtonFormField<String>(
                 value: _expenseHead,
-                decoration: InputDecoration(labelText: 'Expense Head', labelStyle: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                decoration: InputDecoration(
+                  labelText: 'Expense Head',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 items: _expenseHeads.map((head) {
                   return DropdownMenuItem<String>(
                     value: head['name'],
-                    child: Text(head['name'], style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                    child: Text(
+                      head['name'],
+                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                    ),
                   );
                 }).toList(),
                 onChanged: (value) {
@@ -212,7 +249,10 @@ class _AddBillPageState extends State<AddBillPage> {
                 validator: (value) => value == null ? 'Please select an expense head' : null,
               ),
               ListTile(
-                title: Text('Date: ${DateFormat('dd/MM/yy').format(_selectedDate)}', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                title: Text(
+                  'Date: ${DateFormat('dd/MM/yy').format(_selectedDate)}',
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () => _selectDate(context),
               ),
@@ -229,7 +269,10 @@ class _AddBillPageState extends State<AddBillPage> {
                   minimumSize: const Size(150, 40),
                   elevation: 0,
                 ),
-                child: Text('Pick Image', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+                child: Text(
+                  'Pick Image',
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                ),
               ),
               ElevatedButton(
                 onPressed: _submitForm,
@@ -239,7 +282,10 @@ class _AddBillPageState extends State<AddBillPage> {
                   minimumSize: const Size(150, 40),
                   elevation: 0,
                 ),
-                child: Text('Submit', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+                child: Text(
+                  'Submit',
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),

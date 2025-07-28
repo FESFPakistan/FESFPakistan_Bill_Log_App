@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:petty_cash_app/pages/bill_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:petty_cash_app/main.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -49,9 +50,11 @@ class _LoginPageState extends State<LoginPage> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body)['data'];
           final user = data['user'];
+          final token = data['token']; // Assuming token is in data
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('name', user['name']);
           await prefs.setString('locationCode', user['location']['code']);
+          await prefs.setString('auth_token', token); // Save token
           if (_rememberMe) {
             await prefs.setString('saved_email', email);
             await prefs.setString('saved_password', password);
@@ -73,12 +76,12 @@ class _LoginPageState extends State<LoginPage> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Login failed")),
+            SnackBar(content: Text("Login failed", style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)))),
           );
         }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(content: Text("Error: $e", style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)))),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -97,7 +100,13 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Login', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+        title: Text(
+          'Login',
+          style: GoogleFonts.montserrat(
+            fontSize: getResponsiveFontSize(context, 18.0),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -108,13 +117,25 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               TextFormField(
                 controller: _usernameController,
-                decoration: InputDecoration(labelText: 'Email', labelStyle: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: GoogleFonts.montserrat(
+                    fontSize: getResponsiveFontSize(context, 14.0),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
                 validator: (value) => value!.isEmpty ? 'Please enter email' : null,
                 keyboardType: TextInputType.emailAddress,
               ),
               TextFormField(
                 controller: _passwordController,
-                decoration: InputDecoration(labelText: 'Password', labelStyle: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  labelStyle: GoogleFonts.montserrat(
+                    fontSize: getResponsiveFontSize(context, 14.0),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
                 obscureText: true,
                 validator: (value) => value!.isEmpty ? 'Please enter password' : null,
               ),
@@ -128,7 +149,13 @@ class _LoginPageState extends State<LoginPage> {
                       });
                     },
                   ),
-                  Text('Remember Me', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+                  Text(
+                    'Remember Me',
+                    style: GoogleFonts.montserrat(
+                      fontSize: getResponsiveFontSize(context, 14.0),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
                 ],
               ),
               SizedBox(height: 20.0),
@@ -142,7 +169,13 @@ class _LoginPageState extends State<LoginPage> {
                         minimumSize: const Size(150, 40),
                         elevation: 0,
                       ),
-                      child: Text('Login', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+                      child: Text(
+                        'Login',
+                        style: GoogleFonts.montserrat(
+                          fontSize: getResponsiveFontSize(context, 14.0),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
             ],
           ),
