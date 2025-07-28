@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:petty_cash_app/pages/bill_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io' show Platform;
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class NewLoginPage extends StatefulWidget {

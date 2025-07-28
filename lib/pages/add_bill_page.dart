@@ -80,7 +80,7 @@ class _AddBillPageState extends State<AddBillPage> {
 
     if (sourcePath != null) {
       final croppedFile = await ImageCropper().cropImage(
-        sourcePath: sourcePath!,
+        sourcePath: sourcePath,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         compressQuality: 80,
         uiSettings: [
