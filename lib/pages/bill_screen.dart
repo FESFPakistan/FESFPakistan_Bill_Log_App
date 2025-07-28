@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:petty_cash_app/extra%20pages/new_login_page.dart';
-import 'package:petty_cash_app/extra%20pages/new_add_bill_page.dart';
+import 'package:petty_cash_app/pages/login_page.dart';
+import 'package:petty_cash_app/pages/add_bill_page.dart';
 
 class BillScreen extends StatefulWidget {
   final String name;
   final String locationCode;
 
-  const BillScreen({Key? key, required this.name, required this.locationCode}) : super(key: key);
+  const BillScreen({super.key, required this.name, required this.locationCode});
 
   @override
   _BillScreenState createState() => _BillScreenState();
@@ -40,6 +40,7 @@ class _BillScreenState extends State<BillScreen> {
         });
       }
     } catch (e) {
+      // ignore: avoid_print
       print('Error loading bills: $e');
     }
   }
@@ -51,6 +52,7 @@ class _BillScreenState extends State<BillScreen> {
       final file = File('${directory.path}/$fileName');
       await file.writeAsString(json.encode(bills));
     } catch (e) {
+      // ignore: avoid_print
       print('Error saving bills: $e');
     }
   }
@@ -104,7 +106,7 @@ class _BillScreenState extends State<BillScreen> {
   void _logout() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => NewLoginPage()),
+      MaterialPageRoute(builder: (context) => LoginPage()),
     );
   }
 
@@ -173,28 +175,28 @@ class _BillScreenState extends State<BillScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Name: ${widget.name}', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+                Text('${widget.name}', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2.0),
-                Text('Location Code: ${widget.locationCode}', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w400)),
+                Text('${widget.locationCode}', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w400)),
               ],
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.logout),
+            icon: const Icon(Icons.logout),
             onPressed: _logout,
           ),
         ],
       ),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withValues(),
+              color: Color.fromRGBO(128, 128, 128, 0.2), // Replaced with RGBO with 20% opacity
               spreadRadius: 2,
               blurRadius: 5,
-              offset: const Offset(0, 3),
+              offset: Offset(0, 3),
             ),
           ],
         ),
@@ -229,7 +231,7 @@ class _BillScreenState extends State<BillScreen> {
                           ),
                           const SizedBox(width: 8.0),
                           IconButton(
-                            icon: Icon(Icons.refresh),
+                            icon: const Icon(Icons.refresh),
                             onPressed: _refreshBalance,
                             iconSize: 18,
                           ),
@@ -305,7 +307,7 @@ class _BillScreenState extends State<BillScreen> {
                                             ),
                                           ),
                                           Text(
-                                            '(${financialPeriodLabel})',
+                                            '($financialPeriodLabel)',
                                             style: GoogleFonts.montserrat(fontSize: 8, fontWeight: FontWeight.w400),
                                           ),
                                         ],
@@ -350,7 +352,7 @@ class _BillScreenState extends State<BillScreen> {
                       onPressed: () async {
                         final result = await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => NewAddBillPage()),
+                          MaterialPageRoute(builder: (context) => const AddBillPage()),
                         );
                         if (result != null) {
                           final narration = result['narration'] as String;

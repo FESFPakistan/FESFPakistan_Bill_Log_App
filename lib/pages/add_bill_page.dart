@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class AddBillPage extends StatefulWidget {
-  const AddBillPage({Key? key}) : super(key: key);
+  const AddBillPage({super.key});
 
   @override
   _AddBillPageState createState() => _AddBillPageState();
@@ -42,11 +42,13 @@ class _AddBillPageState extends State<AddBillPage> {
         throw Exception('Failed to load expense heads');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(kontxt()).showSnackBar(
         SnackBar(content: Text('Error loading expense heads: $e')),
       );
     }
   }
+
+  BuildContext kontxt() => context;
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -135,8 +137,8 @@ class _AddBillPageState extends State<AddBillPage> {
         return Theme(
           data: ThemeData.light().copyWith(
             primaryColor: Colors.deepPurple,
-            colorScheme: ColorScheme.light(primary: Colors.deepPurple),
-            buttonTheme: ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            colorScheme: const ColorScheme.light(primary: Colors.deepPurple),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
           ),
           child: child!,
         );
