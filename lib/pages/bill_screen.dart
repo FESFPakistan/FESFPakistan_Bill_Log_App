@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:petty_cash_app/main.dart';
 import 'package:petty_cash_app/pages/login_page.dart';
 import 'package:petty_cash_app/pages/add_bill_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,14 +77,14 @@ class _BillScreenState extends State<BillScreen> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Confirm Delete', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w500)),
-        content: Text('Are you sure you want to delete this bill?', style: GoogleFonts.montserrat(fontSize: 14)),
+        title: Text('Confirm Delete', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500)),
+        content: Text('Are you sure you want to delete this bill?', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0))),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: Text('Cancel', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+            child: Text('Cancel', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
           ),
           TextButton(
             onPressed: () {
@@ -94,7 +95,7 @@ class _BillScreenState extends State<BillScreen> {
               Navigator.of(context).pop();
               confirm = true;
             },
-            child: Text('Delete', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+            child: Text('Delete', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -135,17 +136,17 @@ class _BillScreenState extends State<BillScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Bill Details', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+        title: Text('Bill Details', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w600)),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Date: $formattedDate', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
-              Text('Expense Head: ${bill['expenseHead'] ?? 'General'}', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
-              Text('Narration: ${bill['narration'] ?? ''}', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
-              Text('Amount: Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
-              Text('Status: ${isAttached ? 'Uploaded' : 'Not Uploaded'} ($financialPeriodLabel)', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w400)),
+              Text('Date: $formattedDate', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+              Text('Expense Head: ${bill['expenseHead'] ?? 'General'}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400)),
+              Text('Narration: ${bill['narration'] ?? ''}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400)),
+              Text('Amount: Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+              Text('Status: ${isAttached ? 'Uploaded' : 'Not Uploaded'} ($financialPeriodLabel)', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400)),
               if (bill['imagePath'] != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 10.0),
@@ -162,7 +163,7 @@ class _BillScreenState extends State<BillScreen> {
             onPressed: () {
               Navigator.of(context).pop();
             },
-            child: Text('Close', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+            child: Text('Close', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -183,9 +184,9 @@ class _BillScreenState extends State<BillScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.name, style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+                Text(widget.name, style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2.0),
-                Text(widget.locationCode, style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w400)),
+                Text(widget.locationCode, style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 12.0), fontWeight: FontWeight.w400)),
               ],
             ),
           ],
@@ -224,10 +225,10 @@ class _BillScreenState extends State<BillScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Balance', style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+                          Text('Balance', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
                           Text(
                             currentDateTime,
-                            style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w400, color: Colors.grey),
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -235,7 +236,7 @@ class _BillScreenState extends State<BillScreen> {
                         children: [
                           Text(
                             'Rs. ${NumberFormat('#,###').format(_balance.round())}',
-                            style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
                           const SizedBox(width: 8.0),
                           IconButton(
                             icon: const Icon(Icons.refresh),
@@ -287,11 +288,11 @@ class _BillScreenState extends State<BillScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('Date: $formattedDate', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w500)),
-                                      Text('Exp: ${bill['expenseHead'] ?? 'General'}', style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w400)),
+                                      Text('Date: $formattedDate', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 12.0), fontWeight: FontWeight.w500)),
+                                      Text('Exp: ${bill['expenseHead'] ?? 'General'}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400)),
                                       Text(
                                         bill['narration'] ?? '',
-                                        style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w400),
+                                        style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400),
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -308,14 +309,14 @@ class _BillScreenState extends State<BillScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
                                               child: Text(
                                                 isAttached ? 'Uploaded' : 'Not Uploaded',
-                                                style: GoogleFonts.montserrat(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w400),
+                                                style: GoogleFonts.montserrat(color: Colors.white, fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400),
                                                 textAlign: TextAlign.center,
                                               ),
                                             ),
                                           ),
                                           Text(
                                             '($financialPeriodLabel)',
-                                            style: GoogleFonts.montserrat(fontSize: 8, fontWeight: FontWeight.w400),
+                                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 8.0), fontWeight: FontWeight.w400),
                                           ),
                                         ],
                                       ),
@@ -326,7 +327,7 @@ class _BillScreenState extends State<BillScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w500)),
+                                    Text('Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 12.0), fontWeight: FontWeight.w500)),
                                     if (bill['imagePath'] != null)
                                       GestureDetector(
                                         onDoubleTap: () {
@@ -376,7 +377,7 @@ class _BillScreenState extends State<BillScreen> {
                         minimumSize: const Size(150, 40),
                         elevation: 0,
                       ),
-                      child: Text('Add Bill', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w500)),
+                      child: Text('Add Bill', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w500)),
                     ),
                     ElevatedButton(
                       onPressed: () {
@@ -390,7 +391,7 @@ class _BillScreenState extends State<BillScreen> {
                         minimumSize: const Size(150, 40),
                         elevation: 0,
                       ),
-                      child: Text('Upload All', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w500)),
+                      child: Text('Upload All', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w500)),
                     ),
                   ],
                 ),

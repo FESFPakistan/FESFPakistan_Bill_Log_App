@@ -52,12 +52,11 @@ class _AddBillPageState extends State<AddBillPage> {
         _expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
       });
     } else {
-      // Set default expense head if no cached data
       setState(() {
         _expenseHeads = [
           {'id': 0, 'name': 'General', 'code': 'GENERAL'}
         ];
-        _expenseHead = 'General'; // Pre-select General
+        _expenseHead = 'General';
       });
       if (await _hasInternetConnection()) {
         await _fetchExpenseHeads();
@@ -94,7 +93,6 @@ class _AddBillPageState extends State<AddBillPage> {
         final data = jsonDecode(response.body) as List;
         setState(() {
           _expenseHeads = data.map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']}).toList();
-          // Ensure General is included if not in API response
           if (!_expenseHeads.any((head) => head['name'] == 'General')) {
             _expenseHeads.insert(0, {'id': 0, 'name': 'General', 'code': 'GENERAL'});
           }
@@ -293,7 +291,7 @@ class _AddBillPageState extends State<AddBillPage> {
                     value: head['name'],
                     child: Text(
                       head['name'],
-                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 13.0), fontWeight: FontWeight.w400),
+                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
                     ),
                   );
                 }).toList(),
