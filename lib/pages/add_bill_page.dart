@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:petty_cash_app/main.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AddBillPage extends StatefulWidget {
   const AddBillPage({super.key});
@@ -28,7 +29,53 @@ class _AddBillPageState extends State<AddBillPage> {
   @override
   void initState() {
     super.initState();
-    _fetchExpenseHeads();
+    _loadExpenseHeads();
+  }
+
+  Future<bool> _hasInternetConnection() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
+  bool _shouldFetchExpenseHeads() {
+    final now = DateTime.now();
+    final isFirstOrSixteenth = now.day == 1 || now.day == 16;
+    return isFirstOrSixteenth;
+  }
+
+  Future<void> _loadExpenseHeads() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedExpenseHeads = prefs.getString('expense_heads');
+
+    if (cachedExpenseHeads != null) {
+      setState(() {
+        _expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
+      });
+    } else {
+      // Set default expense head if no cached data
+      setState(() {
+        _expenseHeads = [
+          {'id': 0, 'name': 'General', 'code': 'GENERAL'}
+        ];
+        _expenseHead = 'General'; // Pre-select General
+      });
+      if (await _hasInternetConnection()) {
+        await _fetchExpenseHeads();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'No internet connection. Using default expense head.',
+              style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+            ),
+          ),
+        );
+      }
+    }
+
+    if (await _hasInternetConnection() && _shouldFetchExpenseHeads()) {
+      await _fetchExpenseHeads();
+    }
   }
 
   Future<void> _fetchExpenseHeads() async {
@@ -40,25 +87,34 @@ class _AddBillPageState extends State<AddBillPage> {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token', // Include token in header
+          'Authorization': 'Bearer $token',
         },
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         setState(() {
           _expenseHeads = data.map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']}).toList();
+          // Ensure General is included if not in API response
+          if (!_expenseHeads.any((head) => head['name'] == 'General')) {
+            _expenseHeads.insert(0, {'id': 0, 'name': 'General', 'code': 'GENERAL'});
+          }
+          _expenseHead = _expenseHeads.isNotEmpty ? _expenseHeads[0]['name'] : 'General';
         });
+        await prefs.setString('expense_heads', jsonEncode(_expenseHeads));
       } else {
         throw Exception('Failed to load expense heads: ${response.statusCode}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(kontxt()).showSnackBar(
-        SnackBar(content: Text('Error loading expense heads: $e', style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)))),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error loading expense heads: $e',
+            style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+          ),
+        ),
       );
     }
   }
-
-  BuildContext kontxt() => context;
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -237,7 +293,7 @@ class _AddBillPageState extends State<AddBillPage> {
                     value: head['name'],
                     child: Text(
                       head['name'],
-                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 13.0), fontWeight: FontWeight.w400),
                     ),
                   );
                 }).toList(),

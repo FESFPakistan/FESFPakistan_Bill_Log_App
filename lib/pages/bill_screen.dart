@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:petty_cash_app/pages/login_page.dart';
 import 'package:petty_cash_app/pages/add_bill_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class BillScreen extends StatefulWidget {
   final String name;
@@ -40,7 +41,6 @@ class _BillScreenState extends State<BillScreen> {
         });
       }
     } catch (e) {
-      // ignore: avoid_print
       print('Error loading bills: $e');
     }
   }
@@ -52,7 +52,6 @@ class _BillScreenState extends State<BillScreen> {
       final file = File('${directory.path}/$fileName');
       await file.writeAsString(json.encode(bills));
     } catch (e) {
-      // ignore: avoid_print
       print('Error saving bills: $e');
     }
   }
@@ -103,16 +102,25 @@ class _BillScreenState extends State<BillScreen> {
     return confirm;
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('name');
+    await prefs.remove('locationCode');
+    await prefs.remove('user_id');
+    await prefs.remove('email');
+    await prefs.remove('location_id');
+    await prefs.remove('location_name');
+
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
+      MaterialPageRoute(builder: (context) => const LoginPage()),
     );
   }
 
   void _refreshBalance() {
     setState(() {
-      _balance = Random().nextDouble() * 1000000; // Hardcoded random balance for now
+      _balance = Random().nextDouble() * 1000000;
     });
   }
 
@@ -175,9 +183,9 @@ class _BillScreenState extends State<BillScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${widget.name}', style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
+                Text(widget.name, style: GoogleFonts.montserrat(fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2.0),
-                Text('${widget.locationCode}', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w400)),
+                Text(widget.locationCode, style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w400)),
               ],
             ),
           ],
@@ -193,7 +201,7 @@ class _BillScreenState extends State<BillScreen> {
         decoration: const BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Color.fromRGBO(128, 128, 128, 0.2), // Replaced with RGBO with 20% opacity
+              color: Color.fromRGBO(128, 128, 128, 0.2),
               spreadRadius: 2,
               blurRadius: 5,
               offset: Offset(0, 3),
@@ -227,8 +235,7 @@ class _BillScreenState extends State<BillScreen> {
                         children: [
                           Text(
                             'Rs. ${NumberFormat('#,###').format(_balance.round())}',
-                            style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500),
-                          ),
+                            style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500)),
                           const SizedBox(width: 8.0),
                           IconButton(
                             icon: const Icon(Icons.refresh),

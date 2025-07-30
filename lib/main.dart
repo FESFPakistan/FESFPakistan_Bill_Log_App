@@ -1,20 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:petty_cash_app/pages/login_page.dart';
+import 'package:petty_cash_app/pages/bill_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Utility function for responsive font size
 double getResponsiveFontSize(BuildContext context, double baseFontSize) {
   final scaleFactor = MediaQuery.of(context).textScaleFactor;
   final screenWidth = MediaQuery.of(context).size.width;
-  // Base font size scaled by screen width and text scale factor
-  return baseFontSize * scaleFactor * (screenWidth / 375); // 375 as reference width (e.g., iPhone 6)
+  return baseFontSize * scaleFactor * (screenWidth / 375);
 }
 
 void main() {
-  runApp(MaterialApp(
-    home: LoginPage(),
-    debugShowCheckedModeBanner: false,
-    theme: theme(),
-  ));
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  Future<Widget> _getInitialScreen() async {
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('auth_token');
+    final name = prefs.getString('name');
+    final locationCode = prefs.getString('locationCode');
+
+    if (authToken != null && name != null && locationCode != null) {
+      return BillScreen(name: name, locationCode: locationCode);
+    } else {
+      return const LoginPage();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: FutureBuilder<Widget>(
+        future: _getInitialScreen(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return snapshot.data ?? const LoginPage();
+        },
+      ),
+      debugShowCheckedModeBanner: false,
+      theme: theme(),
+    );
+  }
 }
 
 ThemeData theme() {
@@ -22,11 +55,10 @@ ThemeData theme() {
     fontFamily: 'GoogleSans',
     primarySwatch: Colors.deepPurple,
     textTheme: const TextTheme(
-      // Define base font sizes that will be scaled
-      titleLarge: TextStyle(fontSize: 18.0), // For AppBar titles
-      bodyLarge: TextStyle(fontSize: 14.0), // For general text
-      bodyMedium: TextStyle(fontSize: 12.0), // For smaller text
-      bodySmall: TextStyle(fontSize: 10.0), // For very small text
+      titleLarge: TextStyle(fontSize: 18.0),
+      bodyLarge: TextStyle(fontSize: 14.0),
+      bodyMedium: TextStyle(fontSize: 12.0),
+      bodySmall: TextStyle(fontSize: 10.0),
     ),
   );
 }
