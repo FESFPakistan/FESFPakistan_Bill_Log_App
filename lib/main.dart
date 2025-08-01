@@ -15,8 +15,6 @@ double getResponsiveFontSize(BuildContext context, double baseFontSize) {
   const double mediumPhoneWidth = 375.0; // e.g., iPhone 6/7/8
   const double largePhoneWidth = 414.0; // e.g., iPhone 11
   const double tabletWidth = 600.0; // e.g., iPad
-  const double baseAspectRatio = 9 / 16; // Standard aspect ratio for phones
-  const double baseTabletAspectRatio = 4 / 3; // Standard aspect ratio for tablets
 
   // Select reference width based on screen size
   double referenceWidth;

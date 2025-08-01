@@ -19,10 +19,6 @@ dependencies:
   connectivity_plus: ^6.1.4
   auto_size_text: ^3.0.0
   device_info_plus: ^11.5.0
-  image_cropper_for_web: ^6.1.0
-  im\age_cropper_web: ^1.0.0
-  croppie: ^0.1.0
-  imaage_cropper_plus: ^1.0.0
 
 dev_dependencies:
   flutter_test:

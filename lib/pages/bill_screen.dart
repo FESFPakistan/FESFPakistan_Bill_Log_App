@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,6 +9,7 @@ import 'package:petty_cash_app/main.dart';
 import 'package:petty_cash_app/pages/login_page.dart';
 import 'package:petty_cash_app/pages/add_bill_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class BillScreen extends StatefulWidget {
   final String name;
@@ -22,7 +23,8 @@ class BillScreen extends StatefulWidget {
 
 class _BillScreenState extends State<BillScreen> {
   List<Map<String, dynamic>> bills = [];
-  double _balance = 0.0;
+  double _balance = 0.0; // Ensure this is the only _balance variable
+  bool _isRefreshing = false; // Loading indicator
 
   @override
   void initState() {
@@ -32,14 +34,24 @@ class _BillScreenState extends State<BillScreen> {
 
   Future<void> _loadBills() async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills.json';
-      final file = File('${directory.path}/$fileName');
-      if (file.existsSync()) {
-        final jsonString = await file.readAsString();
-        setState(() {
-          bills = List<Map<String, dynamic>>.from(json.decode(jsonString));
-        });
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonString = prefs.getString('${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills');
+        if (jsonString != null) {
+          setState(() {
+            bills = List<Map<String, dynamic>>.from(json.decode(jsonString));
+          });
+        }
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = '${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills.json';
+        final file = File('${directory.path}/$fileName');
+        if (file.existsSync()) {
+          final jsonString = await file.readAsString();
+          setState(() {
+            bills = List<Map<String, dynamic>>.from(json.decode(jsonString));
+          });
+        }
       }
     } catch (e) {
       print('Error loading bills: $e');
@@ -48,10 +60,15 @@ class _BillScreenState extends State<BillScreen> {
 
   Future<void> _saveBills() async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills.json';
-      final file = File('${directory.path}/$fileName');
-      await file.writeAsString(json.encode(bills));
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills', json.encode(bills));
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = '${widget.locationCode}_${widget.name.replaceAll(' ', '_')}_bills.json';
+        final file = File('${directory.path}/$fileName');
+        await file.writeAsString(json.encode(bills));
+      }
     } catch (e) {
       print('Error saving bills: $e');
     }
@@ -119,10 +136,54 @@ class _BillScreenState extends State<BillScreen> {
     );
   }
 
-  void _refreshBalance() {
+  Future<void> _refreshBalance() async {
+    if (!mounted) return;
     setState(() {
-      _balance = Random().nextDouble() * 1000000;
+      _isRefreshing = true;
     });
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    if (token.isEmpty) {
+      print('No auth token found in shared_preferences.');
+      if (mounted) setState(() { _isRefreshing = false; });
+      return;
+    }
+    print('Using auth token: $token');
+    print('Current balance before refresh: $_balance'); // Debug before update
+
+    final url = Uri.parse('https://stage-cash.fesf-it.com/api/balance');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      print('API response status: ${response.statusCode}');
+      print('API response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final balance = (data['current_balance'] as num?)?.toDouble() ?? 0.0; // Updated to use 'current_balance'
+        if (mounted) {
+          setState(() {
+            _balance = balance; // Explicitly update _balance
+            _isRefreshing = false;
+          });
+          print('Balance set to: $_balance after setState'); // Debug after update
+        }
+      } else {
+        print('Failed to refresh balance: ${response.statusCode} - ${response.body}');
+        if (mounted) setState(() { _isRefreshing = false; });
+      }
+    } catch (e) {
+      print('Error refreshing balance: $e');
+      if (e is SocketException) {
+        print('Network issue: Check internet connection or domain name: $url');
+      }
+      if (mounted) setState(() { _isRefreshing = false; });
+    }
   }
 
   void _showBillDetails(Map<String, dynamic> bill) {
@@ -172,6 +233,7 @@ class _BillScreenState extends State<BillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('Rendering UI with balance: $_balance'); // Debug UI render
     final sortedBills = List<Map<String, dynamic>>.from(bills)
       ..sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
     final top10Bills = sortedBills.take(10).toList();
@@ -234,9 +296,16 @@ class _BillScreenState extends State<BillScreen> {
                       ),
                       Row(
                         children: [
-                          Text(
-                            'Rs. ${NumberFormat('#,###').format(_balance.round())}',
-                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+                          if (_isRefreshing)
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.0),
+                            )
+                          else
+                            Text(
+                              'Rs. ${NumberFormat('#,###').format(_balance.round())}',
+                              style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
                           const SizedBox(width: 8.0),
                           IconButton(
                             icon: const Icon(Icons.refresh),

@@ -54,9 +54,9 @@ class _AddBillPageState extends State<AddBillPage> {
     } else {
       setState(() {
         _expenseHeads = [
-          {'id': 0, 'name': 'General', 'code': 'GENERAL'}
+          {'id': 0, 'name': '', 'code': ''}
         ];
-        _expenseHead = 'General';
+        _expenseHead = '';
       });
       if (await _hasInternetConnection()) {
         await _fetchExpenseHeads();
@@ -233,7 +233,7 @@ class _AddBillPageState extends State<AddBillPage> {
       final result = {
         'narration': _narrationController.text,
         'amount': double.tryParse(_amountController.text) ?? 0.0,
-        'expenseHead': _expenseHead ?? 'General',
+        'expenseHead': _expenseHead,
         'date': _selectedDate,
         'imagePath': _imagePath,
       };
@@ -284,14 +284,14 @@ class _AddBillPageState extends State<AddBillPage> {
                 value: _expenseHead,
                 decoration: InputDecoration(
                   labelText: 'Expense Head',
-                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 13.0), fontWeight: FontWeight.w400),
                 ),
                 items: _expenseHeads.map((head) {
                   return DropdownMenuItem<String>(
                     value: head['name'],
                     child: Text(
                       head['name'],
-                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                      style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400),
                     ),
                   );
                 }).toList(),
