@@ -24,6 +24,8 @@ class BillScreen extends StatefulWidget {
 class _BillScreenState extends State<BillScreen> {
   List<Map<String, dynamic>> bills = [];
   double _balance = 0.0;
+  double? _openingBalance;
+  String? _formattedStartDate;
   bool _isRefreshing = false;
   String? _activeReportingPeriod;
   bool _isLoadingReportingPeriod = false;
@@ -61,10 +63,13 @@ class _BillScreenState extends State<BillScreen> {
       print('ERROR: No auth token found for reporting period.');
       if (mounted) {
         setState(() { 
-        _activeReportingPeriod = 'No auth token';
-        _isLoadingReportingPeriod = false; 
-      });
+          _activeReportingPeriod = 'No auth token';
+          _openingBalance = null;
+          _formattedStartDate = null;
+          _isLoadingReportingPeriod = false; 
+        });
       }
+      print('=== REPORTING PERIOD DEBUG END ===');
       return;
     }
 
@@ -75,10 +80,13 @@ class _BillScreenState extends State<BillScreen> {
       print('ERROR: No internet connection for reporting period.');
       if (mounted) {
         setState(() { 
-        _activeReportingPeriod = 'No internet';
-        _isLoadingReportingPeriod = false; 
-      });
+          _activeReportingPeriod = 'No internet';
+          _openingBalance = null;
+          _formattedStartDate = null;
+          _isLoadingReportingPeriod = false; 
+        });
       }
+      print('=== REPORTING PERIOD DEBUG END ===');
       return;
     }
 
@@ -98,62 +106,109 @@ class _BillScreenState extends State<BillScreen> {
       print('=== API RESPONSE ===');
       print('Status Code: ${response.statusCode}');
       print('Response Headers: ${response.headers}');
-      print('Response Body: ${response.body}');
+      try {
+        final prettyJson = JsonEncoder.withIndent('  ').convert(jsonDecode(response.body));
+        print('Raw JSON Response:\n$prettyJson');
+      } catch (e) {
+        print('Raw Response (unformatted): ${response.body}');
+      }
       print('Response Body Length: ${response.body.length}');
 
       if (response.statusCode == 200) {
         try {
           final data = jsonDecode(response.body);
-          print('Parsed JSON data: $data');
-          print('Data type: ${data.runtimeType}');
+          print('Parsed JSON data type: ${data.runtimeType}');
           
           if (data is Map<String, dynamic>) {
             final reportingPeriod = data['active_reporting_period'];
-            print('Active reporting period from API: $reportingPeriod (type: ${reportingPeriod.runtimeType})');
+            print('Active reporting period value: $reportingPeriod');
+            print('Active reporting period type: ${reportingPeriod.runtimeType}');
             
-            // Extract just the name/value, not the entire object
-            String displayValue;
             if (reportingPeriod is Map<String, dynamic>) {
-              // If it's an object, try to get a name field
-              displayValue = reportingPeriod['name']?.toString() ?? 
-                           reportingPeriod['period']?.toString() ?? 
-                           reportingPeriod['title']?.toString() ?? 
-                           reportingPeriod.toString();
-            } else if (reportingPeriod is String) {
-              // If it's already a string, use it directly
-              displayValue = reportingPeriod;
-            } else if (reportingPeriod != null) {
-              // Convert other types to string
-              displayValue = reportingPeriod.toString();
-            } else {
-              displayValue = 'No active period found';
-            }
-            
-            print('Display value extracted: $displayValue');
-            
-            if (mounted) {
-              setState(() {
-                _activeReportingPeriod = displayValue;
-                _isLoadingReportingPeriod = false;
+              print('Active reporting period is an object with fields:');
+              reportingPeriod.forEach((key, value) {
+                print('  $key: $value (type: ${value.runtimeType})');
               });
-              print('UI updated with reporting period: $_activeReportingPeriod');
+              String displayValue = reportingPeriod['name']?.toString() ?? 
+                                  reportingPeriod['period']?.toString() ?? 
+                                  reportingPeriod['title']?.toString() ?? 
+                                  reportingPeriod.toString();
+              double? openingBalance = reportingPeriod['pivot']?['opening_balance']?.toDouble();
+              String? formattedStartDate;
+              final startDate = reportingPeriod['start_date'];
+              if (startDate != null) {
+                try {
+                  final dateFormat = DateFormat('dd-MMM-yy', 'en_US');
+                  final parsedDate = dateFormat.parseLoose(startDate);
+                  formattedStartDate = DateFormat('dd-MMM-yyyy', 'en_US').format(parsedDate);
+                  print('Parsed start_date: $startDate to $formattedStartDate');
+                } catch (e) {
+                  print('ERROR: Failed to parse start_date ($startDate): $e');
+                  formattedStartDate = null;
+                }
+              }
+              print('Selected display value: $displayValue');
+              print('Opening balance: $openingBalance');
+              print('Formatted start date: $formattedStartDate');
+              if (mounted) {
+                setState(() {
+                  _activeReportingPeriod = displayValue;
+                  _openingBalance = openingBalance;
+                  _formattedStartDate = formattedStartDate;
+                  _isLoadingReportingPeriod = false;
+                });
+              }
+            } else if (reportingPeriod is String) {
+              print('Active reporting period is a string.');
+              if (mounted) {
+                setState(() {
+                  _activeReportingPeriod = reportingPeriod;
+                  _openingBalance = null;
+                  _formattedStartDate = null;
+                  _isLoadingReportingPeriod = false;
+                });
+              }
+            } else if (reportingPeriod != null) {
+              print('Active reporting period is neither object nor string, converting to string.');
+              if (mounted) {
+                setState(() {
+                  _activeReportingPeriod = reportingPeriod.toString();
+                  _openingBalance = null;
+                  _formattedStartDate = null;
+                  _isLoadingReportingPeriod = false;
+                });
+              }
+            } else {
+              print('ERROR: active_reporting_period is null.');
+              if (mounted) {
+                setState(() { 
+                  _activeReportingPeriod = 'No active period found';
+                  _openingBalance = null;
+                  _formattedStartDate = null;
+                  _isLoadingReportingPeriod = false; 
+                });
+              }
             }
           } else {
             print('ERROR: Response data is not a Map, it is: ${data.runtimeType}');
             if (mounted) {
               setState(() { 
-              _activeReportingPeriod = 'Invalid response format';
-              _isLoadingReportingPeriod = false; 
-            });
+                _activeReportingPeriod = 'Invalid response format';
+                _openingBalance = null;
+                _formattedStartDate = null;
+                _isLoadingReportingPeriod = false; 
+              });
             }
           }
         } catch (jsonError) {
           print('ERROR: JSON parsing failed: $jsonError');
           if (mounted) {
             setState(() { 
-            _activeReportingPeriod = 'JSON parse error: $jsonError';
-            _isLoadingReportingPeriod = false; 
-          });
+              _activeReportingPeriod = 'JSON parse error';
+              _openingBalance = null;
+              _formattedStartDate = null;
+              _isLoadingReportingPeriod = false; 
+            });
           }
         }
       } else {
@@ -161,9 +216,11 @@ class _BillScreenState extends State<BillScreen> {
         print('Error response body: ${response.body}');
         if (mounted) {
           setState(() { 
-          _activeReportingPeriod = 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
-          _isLoadingReportingPeriod = false; 
-        });
+            _activeReportingPeriod = 'HTTP ${response.statusCode}';
+            _openingBalance = null;
+            _formattedStartDate = null;
+            _isLoadingReportingPeriod = false; 
+          });
         }
       }
     } catch (e) {
@@ -175,12 +232,17 @@ class _BillScreenState extends State<BillScreen> {
       }
       if (mounted) {
         setState(() { 
-        _activeReportingPeriod = 'Exception: ${e.toString()}';
-        _isLoadingReportingPeriod = false; 
-      });
+          _activeReportingPeriod = 'Exception: ${e.toString()}';
+          _openingBalance = null;
+          _formattedStartDate = null;
+          _isLoadingReportingPeriod = false; 
+        });
       }
     }
     
+    print('Final active reporting period set to: $_activeReportingPeriod');
+    print('Final opening balance set to: $_openingBalance');
+    print('Final formatted start date set to: $_formattedStartDate');
     print('=== REPORTING PERIOD DEBUG END ===');
   }
 
@@ -347,8 +409,8 @@ class _BillScreenState extends State<BillScreen> {
 
   void _showBillDetails(Map<String, dynamic> bill) {
     final dateTime = DateTime.parse(bill['date']);
-    final formattedDate = DateFormat('dd-MMM-yy').format(dateTime);
-    final monthName = DateFormat('MMMM').format(dateTime);
+    final formattedDate = DateFormat('dd-MMM-yyyy', 'en_US').format(dateTime);
+    final monthName = DateFormat('MMMM', 'en_US').format(dateTime);
     final financialPeriod = dateTime.day <= 15 ? '1st Half' : '2nd Half';
     final financialPeriodLabel = '$monthName-$financialPeriod';
     bool isAttached = bill['attached'] ?? false;
@@ -367,7 +429,7 @@ class _BillScreenState extends State<BillScreen> {
               Text('Narration: ${bill['narration'] ?? ''}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400)),
               Text('Amount: Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
               Text('Status: ${isAttached ? 'Uploaded' : 'Not Uploaded'} ($financialPeriodLabel)', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400)),
-              if (bill['imagePath'] != null)
+              if (bill['imagePath'] != null && !kIsWeb)
                 Padding(
                   padding: const EdgeInsets.only(top: 10.0),
                   child: Image.file(
@@ -392,11 +454,11 @@ class _BillScreenState extends State<BillScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('Rendering UI with balance: $_balance');
+    print('Rendering UI with balance: $_balance, opening balance: $_openingBalance');
     final sortedBills = List<Map<String, dynamic>>.from(bills)
       ..sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
     final top10Bills = sortedBills.take(10).toList();
-    final currentDateTime = DateFormat('dd-MMM-yy hh:mm a').format(DateTime.now());
+    final currentDateTime = DateFormat('dd-MMM-yyyy', 'en_US').format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
@@ -435,7 +497,7 @@ class _BillScreenState extends State<BillScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Balance Card
+              // Opening Balance Card
               Card(
                 elevation: 2.0,
                 margin: const EdgeInsets.only(bottom: 8.0),
@@ -447,7 +509,40 @@ class _BillScreenState extends State<BillScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Balance', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+                          Text(
+                            'Opening Balance',
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            _formattedStartDate ?? 'N/A',
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        _openingBalance != null ? 'Rs. ${NumberFormat('#,###').format(_openingBalance!.round())}' : 'N/A',
+                        style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Current Balance Card
+              Card(
+                elevation: 2.0,
+                margin: const EdgeInsets.only(bottom: 8.0),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Current Balance',
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                          ),
                           Text(
                             currentDateTime,
                             style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400, color: Colors.grey),
@@ -465,7 +560,8 @@ class _BillScreenState extends State<BillScreen> {
                           else
                             Text(
                               'Rs. ${NumberFormat('#,###').format(_balance.round())}',
-                              style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+                              style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                            ),
                           const SizedBox(width: 8.0),
                           IconButton(
                             icon: const Icon(Icons.refresh),
@@ -536,8 +632,8 @@ class _BillScreenState extends State<BillScreen> {
                   itemBuilder: (context, index) {
                     final bill = top10Bills[index];
                     final dateTime = DateTime.parse(bill['date']);
-                    final formattedDate = DateFormat('dd-MMM-yy').format(dateTime);
-                    final monthName = DateFormat('MMMM').format(dateTime);
+                    final formattedDate = DateFormat('dd-MMM-yyyy', 'en_US').format(dateTime);
+                    final monthName = DateFormat('MMMM', 'en_US').format(dateTime);
                     final financialPeriod = dateTime.day <= 15 ? '1st Half' : '2nd Half';
                     final financialPeriodLabel = '$monthName-$financialPeriod';
                     bool isAttached = bill['attached'] ?? false;
@@ -609,7 +705,7 @@ class _BillScreenState extends State<BillScreen> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text('Rs. ${NumberFormat('#,###').format(bill['amount'].round())}', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 12.0), fontWeight: FontWeight.w500)),
-                                    if (bill['imagePath'] != null)
+                                    if (bill['imagePath'] != null && !kIsWeb)
                                       GestureDetector(
                                         onDoubleTap: () {
                                           _showBillDetails(bill);
