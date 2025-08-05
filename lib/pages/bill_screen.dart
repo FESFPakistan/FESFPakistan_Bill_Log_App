@@ -55,14 +55,16 @@ class _BillScreenState extends State<BillScreen> {
     
     print('=== REPORTING PERIOD DEBUG START ===');
     print('Auth token exists: ${token.isNotEmpty}');
-    print('Auth token (first 20 chars): ${token.length > 20 ? token.substring(0, 20) + "..." : token}');
+    print('Auth token (first 20 chars): ${token.length > 20 ? "${token.substring(0, 20)}..." : token}');
     
     if (token.isEmpty) {
       print('ERROR: No auth token found for reporting period.');
-      if (mounted) setState(() { 
+      if (mounted) {
+        setState(() { 
         _activeReportingPeriod = 'No auth token';
         _isLoadingReportingPeriod = false; 
       });
+      }
       return;
     }
 
@@ -71,10 +73,12 @@ class _BillScreenState extends State<BillScreen> {
     print('Internet connection available: $hasInternet');
     if (!hasInternet) {
       print('ERROR: No internet connection for reporting period.');
-      if (mounted) setState(() { 
+      if (mounted) {
+        setState(() { 
         _activeReportingPeriod = 'No internet';
         _isLoadingReportingPeriod = false; 
       });
+      }
       return;
     }
 
@@ -136,25 +140,31 @@ class _BillScreenState extends State<BillScreen> {
             }
           } else {
             print('ERROR: Response data is not a Map, it is: ${data.runtimeType}');
-            if (mounted) setState(() { 
+            if (mounted) {
+              setState(() { 
               _activeReportingPeriod = 'Invalid response format';
               _isLoadingReportingPeriod = false; 
             });
+            }
           }
         } catch (jsonError) {
           print('ERROR: JSON parsing failed: $jsonError');
-          if (mounted) setState(() { 
+          if (mounted) {
+            setState(() { 
             _activeReportingPeriod = 'JSON parse error: $jsonError';
             _isLoadingReportingPeriod = false; 
           });
+          }
         }
       } else {
         print('ERROR: HTTP ${response.statusCode} - ${response.reasonPhrase}');
         print('Error response body: ${response.body}');
-        if (mounted) setState(() { 
+        if (mounted) {
+          setState(() { 
           _activeReportingPeriod = 'HTTP ${response.statusCode}: ${response.reasonPhrase}';
           _isLoadingReportingPeriod = false; 
         });
+        }
       }
     } catch (e) {
       print('ERROR: Exception during API call: $e');
@@ -163,10 +173,12 @@ class _BillScreenState extends State<BillScreen> {
         print('Socket Exception details: ${e.message}');
         print('OS Error: ${e.osError}');
       }
-      if (mounted) setState(() { 
+      if (mounted) {
+        setState(() { 
         _activeReportingPeriod = 'Exception: ${e.toString()}';
         _isLoadingReportingPeriod = false; 
       });
+      }
     }
     
     print('=== REPORTING PERIOD DEBUG END ===');
@@ -480,10 +492,6 @@ class _BillScreenState extends State<BillScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Active Reporting Period', style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
-                          Text(
-                            'Current period for bill reporting',
-                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400, color: Colors.grey),
-                          ),
                         ],
                       ),
                       Row(
@@ -588,7 +596,7 @@ class _BillScreenState extends State<BillScreen> {
                                             ),
                                           ),
                                           Text(
-                                            '($financialPeriodLabel)',
+                                            '  ($financialPeriodLabel)',
                                             style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 8.0), fontWeight: FontWeight.w400),
                                           ),
                                         ],
