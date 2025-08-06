@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:petty_cash_app/pages/bill_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:petty_cash_app/main.dart';
+import 'package:petty_cash_app/utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -37,12 +37,12 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
       final email = _usernameController.text;
       final password = _passwordController.text;
-
       final url = Uri.parse("https://stage-cash.fesf-it.com/api/login");
+
       try {
-        setState(() => _isLoading = true);
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
@@ -82,25 +82,10 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          final errorData = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                errorData['message'] ?? "Login failed",
-                style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
-              ),
-            ),
-          );
+          Utils.showSnackBar(context, jsonDecode(response.body)['message'] ?? "Login failed");
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Error: $e",
-              style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
-            ),
-          ),
-        );
+        Utils.showSnackBar(context, "Error: $e");
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -121,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
         title: Text(
           'Login',
           style: GoogleFonts.montserrat(
-            fontSize: getResponsiveFontSize(context, 18.0),
+            fontSize: Utils.getResponsiveFontSize(context, 18.0),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -133,27 +118,17 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextFormField(
+              Utils.buildTextFormField(
                 controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  labelStyle: GoogleFonts.montserrat(
-                    fontSize: getResponsiveFontSize(context, 14.0),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
+                label: 'Email',
+                context: context,
                 validator: (value) => value!.isEmpty ? 'Please enter email' : null,
                 keyboardType: TextInputType.emailAddress,
               ),
-              TextFormField(
+              Utils.buildTextFormField(
                 controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  labelStyle: GoogleFonts.montserrat(
-                    fontSize: getResponsiveFontSize(context, 14.0),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
+                label: 'Password',
+                context: context,
                 obscureText: true,
                 validator: (value) => value!.isEmpty ? 'Please enter password' : null,
               ),
@@ -161,16 +136,12 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   Checkbox(
                     value: _rememberMe,
-                    onChanged: (value) {
-                      setState(() {
-                        _rememberMe = value ?? false;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _rememberMe = value ?? false),
                   ),
                   Text(
                     'Remember Me',
                     style: GoogleFonts.montserrat(
-                      fontSize: getResponsiveFontSize(context, 14.0),
+                      fontSize: Utils.getResponsiveFontSize(context, 14.0),
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -179,21 +150,10 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 20.0),
               _isLoading
                   ? const CircularProgressIndicator()
-                  : ElevatedButton(
+                  : Utils.buildElevatedButton(
                       onPressed: _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurple,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(150, 40),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Login',
-                        style: GoogleFonts.montserrat(
-                          fontSize: getResponsiveFontSize(context, 14.0),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      label: 'Login',
+                      context: context,
                     ),
             ],
           ),
