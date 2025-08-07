@@ -23,6 +23,7 @@ class _BillScreenState extends State<BillScreen> {
   bool _isRefreshingBalance = false;
   bool _isRefreshingPeriod = false;
   String? _activeReportingPeriod;
+  // ignore: unused_field
   String? _formattedStartDate;
 
   @override
