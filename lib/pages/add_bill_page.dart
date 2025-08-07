@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import 'package:petty_cash_app/utils.dart';
+import '../utils.dart';
 
 class AddBillPage extends StatefulWidget {
   const AddBillPage({super.key});

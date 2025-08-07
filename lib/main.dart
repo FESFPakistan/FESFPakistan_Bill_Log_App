@@ -1,8 +1,8 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:petty_cash_app/pages/login_page.dart';
-import 'package:petty_cash_app/pages/bill_screen.dart';
+import '../pages/login_page.dart';
+import '../pages/bill_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

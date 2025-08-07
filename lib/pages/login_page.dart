@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:petty_cash_app/pages/bill_screen.dart';
+import '../pages/bill_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:petty_cash_app/utils.dart';
+import '../utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
