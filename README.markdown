@@ -1,7 +1,7 @@
 # FESFPakistan Bill Log App
 
 ## Overview
-The **FESFPakistan Bill Log App** is a Flutter-based mobile application designed to manage petty cash expenses for FESF Pakistan. It allows users to add, view, and delete bills, track expense heads, and monitor financial periods and balances. The app integrates with a backend API (`https://stage-cash.fesf-it.com`) for fetching expense heads, reporting periods, and balances, with offline support via local storage and caching.
+The **FESFPakistan Bill Log App** is a Flutter-based mobile application designed to bill reciepts for FESF Pakistan. It allows users to add, view, and delete bills, track expense heads, and monitor financial periods and balances. The app integrates with a backend API (`https://stage-cash.fesf-it.com`) for fetching expense heads, reporting periods, and balances, with offline support via local storage and caching.
 
 ### Key Features
 - **Bill Management**: Add, view, and delete bills with details like narration, amount, expense head, date, and attached images.
