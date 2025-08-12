@@ -1,6 +1,6 @@
 {
-    "name": "petty_cash_app",
-    "short_name": "petty_cash_app",
+    "name": "fesfpakistan_bill_log_app",
+    "short_name": "fesfpakistan_bill_log_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

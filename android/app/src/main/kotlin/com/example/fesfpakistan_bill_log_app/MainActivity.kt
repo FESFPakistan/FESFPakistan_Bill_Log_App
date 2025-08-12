@@ -1,4 +1,4 @@
-package com.example.petty_cash_app
+package com.example.fesfpakistan_bill_log_app
 
 import io.flutter.embedding.android.FlutterActivity
 
