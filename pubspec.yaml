@@ -1,8 +1,6 @@
 name: fesfpakistan_bill_log_app
-description: A new Flutter project.
-publish_to: 'none'
+description: A Flutter application for uploading bill expenses for FESF Pakistan.
 version: 1.0.0+1
-
 environment:
   sdk: '>=3.2.0 <4.0.0'
 

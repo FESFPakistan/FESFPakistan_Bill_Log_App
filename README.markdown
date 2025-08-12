@@ -1,7 +1,7 @@
 # FESFPakistan Bill Log App
 
 ## Overview
-The **FESFPakistan Bill Log App** is a Flutter-based mobile application designed to bill reciepts for FESF Pakistan. It allows users to add, view, and delete bills, track expense heads, and monitor financial periods and balances. The app integrates with a backend API (`https://stage-cash.fesf-it.com`) for fetching expense heads, reporting periods, and balances, with offline support via local storage and caching.
+The **FESFPakistan Bill Log App** is a Flutter-based Android application designed to manage petty cash expenses for FESF Pakistan. It allows users to add, view, and delete bills, track expense heads, and monitor financial periods and balances. The app integrates with a backend API (`https://stage-cash.fesf-it.com`) for fetching expense heads, reporting periods, and balances, with offline support via local storage and caching.
 
 ### Key Features
 - **Bill Management**: Add, view, and delete bills with details like narration, amount, expense head, date, and attached images.
@@ -14,10 +14,11 @@ The **FESFPakistan Bill Log App** is a Flutter-based mobile application designed
 ## Prerequisites
 - **Flutter SDK**: Version 3.0.0 or higher
 - **Dart**: Version 2.17.0 or higher
-- **IDE**: Android Studio, VS Code, or any IDE with Flutter support
-- **Device/Emulator**: Android or iOS device/emulator for testing
+- **IDE**: Android Studio or any IDE with Flutter support
+- **Device/Emulator**: Android device or emulator (API 21 or higher)
 - **API Access**: Valid credentials for `https://stage-cash.fesf-it.com` API
 - **Internet Connection**: Required for initial API calls (offline mode supported afterward)
+- **Java**: Version 11 or higher (configured in `build.gradle`)
 
 ## Setup Instructions
 
@@ -39,14 +40,23 @@ The app uses the following packages (defined in `pubspec.yaml`):
 - `google_fonts: ^6.1.0`: For Montserrat font styling
 - `intl: ^0.19.0`: For date and number formatting
 - `image_picker: ^1.0.4`: For selecting images from gallery or camera
-- `image_cropper: ^5.0.0`: For cropping images
+- `image_cropper: ^8.0.2`: For cropping images
 - `path_provider: ^2.1.1`: For accessing local storage
 - `shared_preferences: ^2.2.2`: For caching data
 - `http: ^1.1.0`: For making API requests
 - `connectivity_plus: ^5.0.2`: For checking internet connectivity
-- `url_launcher: ^6.2.1`: For opening help URLs
 
-### 3. Configure API Access
+### 3. Configure Android Build
+- Ensure `android/app/build.gradle` specifies:
+  ```gradle
+  compileOptions {
+      sourceCompatibility JavaVersion.VERSION_11
+      targetCompatibility JavaVersion.VERSION_11
+  }
+  ```
+- Set `minSdkVersion 21`, `compileSdkVersion 33`, and `targetSdkVersion 33`.
+
+### 4. Configure API Access
 - Obtain an `auth_token` from the backend API (`https://stage-cash.fesf-it.com`).
 - Ensure the token is stored in `SharedPreferences` during login via `login_page.dart`.
 - Verify API endpoints:
@@ -54,11 +64,13 @@ The app uses the following packages (defined in `pubspec.yaml`):
   - `GET /api/reporting-period`: Fetches the active reporting period and opening balance
   - `GET /api/balance`: Fetches the current balance
 
-### 4. Run the App
+### 5. Run the App
+Connect an Android device or start an emulator (API 21+), then run:
 ```bash
+flutter clean
+flutter pub get
 flutter run
 ```
-- Select a target device (Android/iOS emulator or physical device).
 - Log in using valid credentials to access the `BillScreen`.
 
 ## Project Structure
@@ -100,8 +112,11 @@ fesfpakistan_bill_log_app/
   - **Check**: Console logs for `Reporting Period Response: <statusCode> - <body>`.
   - **Fix**:
     - If `401 Unauthorized`, log out and log in again to refresh the `auth_token`.
-    - If `500` or other errors, verify the API endpoint (`https://stage-cash.fesf-it.com/api/reporting-period`) using Postman.
-    - Clear cache: `SharedPreferences.getInstance().then((prefs) => prefs.clear())`.
+    - If `500` or other errors, verify the API endpoint (`https://stage-cash.fesf-it.com/api/reporting-period`) using a tool like Postman.
+    - Clear cache:
+      ```dart
+      SharedPreferences.getInstance().then((prefs) => prefs.clear());
+      ```
     - Ensure internet connectivity; the app falls back to cached data if offline.
 
 - **Expense Heads Not Loading**:
@@ -109,6 +124,11 @@ fesfpakistan_bill_log_app/
   - **Fix**:
     - Same as above for authentication or API issues.
     - The app defaults to a "General" expense head if the API call fails.
+
+- **Build Errors**:
+  - If `image_cropper` fails to compile, ensure `image_cropper: ^8.0.2` is used and Java 11 is configured.
+  - Run `flutter clean` and `flutter pub get` to clear cache.
+  - Check `build.gradle` for correct `compileOptions`.
 
 - **Console Debugging**:
   - Add debug prints in `utils.dart`:

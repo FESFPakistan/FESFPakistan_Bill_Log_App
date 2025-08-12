@@ -20,6 +20,7 @@ class _AddBillPageState extends State<AddBillPage> {
   String? _imagePath;
   List<Map<String, dynamic>> _expenseHeads = [];
   Map<String, dynamic>? _reportingPeriod;
+  bool _isLoadingExpenseHeads = true;
 
   @override
   void initState() {
@@ -30,74 +31,117 @@ class _AddBillPageState extends State<AddBillPage> {
 
   Future<void> _loadExpenseHeads() async {
     final result = await Utils.loadExpenseHeads(context);
-    setState(() {
-      _expenseHeads = result['expenseHeads'];
-      _expenseHead = result['selectedHead'];
-    });
+    if (mounted) {
+      setState(() {
+        _expenseHeads = result['expenseHeads'];
+        _expenseHead = result['selectedHead'];
+        _isLoadingExpenseHeads = false;
+      });
+    }
   }
 
   Future<void> _loadReportingPeriod() async {
     final result = await Utils.fetchReportingPeriod(context);
-    setState(() {
-      _reportingPeriod = result;
-    });
+    if (mounted) {
+      setState(() {
+        _reportingPeriod = result;
+      });
+    }
   }
 
   Future<void> _pickImage() async {
     final pickedFile = await Utils.pickAndCropImage(context);
-    if (pickedFile != null) {
+    if (pickedFile != null && mounted) {
       setState(() {
         _imagePath = pickedFile.path;
       });
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    // Fetch the active reporting period to get start and end dates
+  Future<DateTime> _determineInitialDate(DateTime firstDate, DateTime lastDate) async {
+    DateTime initialDate = _selectedDate;
+    if (initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)) {
+      initialDate = firstDate;
+    }
+    return initialDate;
+  }
+
+  Future<Map<String, dynamic>> _getDateRange() async {
     final reportingPeriod = _reportingPeriod ?? await Utils.fetchReportingPeriod(context);
+    final dateFormat = DateFormat('dd-MMM-yy');
     DateTime firstDate = DateTime.now();
     DateTime lastDate = DateTime.now();
-    DateTime initialDate = _selectedDate;
 
     if (reportingPeriod['period'] != null && !reportingPeriod['period'].contains('Error')) {
       try {
-        final startDateStr = reportingPeriod['start_date'];
-        final endDateStr = reportingPeriod['end_date'];
-        final dateFormat = DateFormat('dd-MMM-yy');
-        firstDate = dateFormat.parse(startDateStr);
-        lastDate = dateFormat.parse(endDateStr);
-
-        // Ensure initialDate is within the reporting period
-        if (initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)) {
-          initialDate = firstDate; // Set to start_date if outside range
+        final startDateStr = reportingPeriod['start_date'] as String?;
+        final endDateStr = reportingPeriod['end_date'] as String?;
+        if (startDateStr != null && endDateStr != null) {
+          firstDate = dateFormat.parse(startDateStr);
+          lastDate = dateFormat.parse(endDateStr);
+        } else {
+          throw Exception('Invalid reporting period dates');
         }
       } catch (e) {
-        Utils.showSnackBar(context, 'Error parsing reporting period dates: $e');
-        return;
+        Utils.showSnackBar(context, 'Error parsing reporting period dates. Using default semi-monthly period.');
+        final semiPeriod = Utils.getSemiMonthlyPeriod();
+        firstDate = dateFormat.parse(semiPeriod['start_date']);
+        lastDate = dateFormat.parse(semiPeriod['end_date']);
       }
     } else {
-      Utils.showSnackBar(context, 'Failed to load reporting period');
-      return;
+      final semiPeriod = Utils.getSemiMonthlyPeriod();
+      firstDate = dateFormat.parse(semiPeriod['start_date']);
+      lastDate = dateFormat.parse(semiPeriod['end_date']);
+      if (reportingPeriod['period']?.contains('Error') != true) {
+        Utils.showSnackBar(context, 'Using default semi-monthly period for date selection.');
+      }
     }
 
+    return {'firstDate': firstDate, 'lastDate': lastDate};
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final dateRange = await _getDateRange();
+    final firstDate = dateRange['firstDate'];
+    final lastDate = dateRange['lastDate'];
+    final initialDate = await _determineInitialDate(firstDate, lastDate);
+
     final picked = await Utils.selectDate(context, initialDate, firstDate, lastDate);
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null && picked != _selectedDate && mounted) {
       setState(() {
         _selectedDate = picked;
       });
     }
   }
 
+  bool _isDateInRange(DateTime date, DateTime firstDate, DateTime lastDate) {
+    return !date.isBefore(firstDate) && !date.isAfter(lastDate);
+  }
+
   void _submitForm() {
+    if (_expenseHeads.isEmpty) {
+      Utils.showSnackBar(context, 'Cannot submit bill: No expense heads available.');
+      return;
+    }
     if (_formKey.currentState!.validate()) {
       if (_imagePath == null) {
         Utils.showSnackBar(context, 'Please pick an image');
         return;
       }
+
       if (_reportingPeriod == null || _reportingPeriod!['period'] == null || _reportingPeriod!['period'].contains('Error')) {
-        Utils.showSnackBar(context, 'Cannot add bill: Reporting period not loaded');
-        return;
+        final semiPeriod = Utils.getSemiMonthlyPeriod();
+        final dateFormat = DateFormat('dd-MMM-yy');
+        final firstDate = dateFormat.parse(semiPeriod['start_date']);
+        final lastDate = dateFormat.parse(semiPeriod['end_date']);
+
+        if (!_isDateInRange(_selectedDate, firstDate, lastDate)) {
+          Utils.showSnackBar(context, 'Selected date is outside the current semi-monthly period');
+          return;
+        }
+        Utils.showSnackBar(context, 'Bill will be saved locally due to reporting period issue.');
       }
+
       Navigator.pop(context, {
         'narration': _narrationController.text,
         'amount': double.tryParse(_amountController.text) ?? 0.0,
@@ -145,23 +189,37 @@ class _AddBillPageState extends State<AddBillPage> {
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Please enter amount' : null,
               ),
-              DropdownButtonFormField<String>(
-                value: _expenseHead,
-                decoration: Utils.inputDecoration(context, 'Expense Head'),
-                items: _expenseHeads.map((head) {
-                  return DropdownMenuItem<String>(
-                    value: head['name'],
-                    child: Text(
-                      head['name'],
-                      style: GoogleFonts.montserrat(
-                          fontSize: Utils.getResponsiveFontSize(context, 10.0),
-                          fontWeight: FontWeight.w400),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) => setState(() => _expenseHead = value),
-                validator: (value) => value == null ? 'Please select an expense head' : null,
-              ),
+              _isLoadingExpenseHeads
+                  ? const Center(child: CircularProgressIndicator())
+                  : _expenseHeads.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Text(
+                            'No expense heads available.',
+                            style: GoogleFonts.montserrat(
+                                fontSize: Utils.getResponsiveFontSize(context, 14.0),
+                                fontWeight: FontWeight.w400,
+                                color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : DropdownButtonFormField<String>(
+                          value: _expenseHead,
+                          decoration: Utils.inputDecoration(context, 'Expense Head'),
+                          items: _expenseHeads.map((head) {
+                            return DropdownMenuItem<String>(
+                              value: head['name'],
+                              child: Text(
+                                head['name'],
+                                style: GoogleFonts.montserrat(
+                                    fontSize: Utils.getResponsiveFontSize(context, 10.0),
+                                    fontWeight: FontWeight.w400),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) => setState(() => _expenseHead = value),
+                          validator: (value) => value == null ? 'Please select an expense head' : null,
+                        ),
               ListTile(
                 title: Text(
                   'Date: ${DateFormat('dd/MM/yy').format(_selectedDate)}',
@@ -183,7 +241,7 @@ class _AddBillPageState extends State<AddBillPage> {
                 context: context,
               ),
               Utils.buildElevatedButton(
-                onPressed: _submitForm,
+                onPressed: _expenseHeads.isEmpty || _isLoadingExpenseHeads ? null : _submitForm,
                 label: 'Submit',
                 context: context,
               ),

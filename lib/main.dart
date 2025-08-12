@@ -1,44 +1,11 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import '../pages/login_page.dart';
-import '../pages/bill_screen.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'pages/login_page.dart';
+import 'pages/bill_screen.dart';
 
 void main() {
-  if (kIsWeb || !Platform.isAndroid) {
-    // Display unsupported platform message for non-Android platforms
-    runApp(const UnsupportedPlatformApp());
-  } else {
-    runApp(const MyApp());
-  }
+  runApp(const MyApp()); 
 }
-
-class UnsupportedPlatformApp extends StatelessWidget {
-  const UnsupportedPlatformApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text(
-            'This app is only supported on Android.',
-            style: GoogleFonts.montserrat(
-              fontSize: 18.0,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-      debugShowCheckedModeBanner: false,
-      theme: theme(),
-    );
-  }
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 

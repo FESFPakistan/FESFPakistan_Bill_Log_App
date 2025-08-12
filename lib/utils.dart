@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'pages/login_page.dart';
 
 class Utils {
   static double getResponsiveFontSize(BuildContext context, double baseFontSize) {
@@ -66,7 +67,7 @@ class Utils {
   }
 
   static Widget buildElevatedButton({
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required String label,
     required BuildContext context,
     double fontSize = 14.0,
@@ -89,7 +90,7 @@ class Utils {
     );
   }
 
-  static Future<void> showSnackBar(BuildContext context, String message) async {
+  static void showSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -102,7 +103,15 @@ class Utils {
 
   static Future<bool> hasInternetConnection() async {
     final connectivityResult = await Connectivity().checkConnectivity();
-    return connectivityResult != ConnectivityResult.none;
+    if (connectivityResult == ConnectivityResult.none) {
+      return false;
+    }
+    try {
+      final result = await InternetAddress.lookup('8.8.8.8').timeout(const Duration(seconds: 5));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
   }
 
   static Future<Map<String, dynamic>> loadExpenseHeads(BuildContext context) async {
@@ -114,12 +123,22 @@ class Utils {
     String selectedHead = 'General';
 
     if (cachedExpenseHeads != null) {
-      expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
+      try {
+        expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
+        selectedHead = expenseHeads.isNotEmpty ? expenseHeads[0]['name'] : 'General';
+      } catch (e) {
+        showSnackBar(context, 'Error reading cached expense heads. Using default.');
+      }
     }
 
-    if (await hasInternetConnection() && (DateTime.now().day == 1 || DateTime.now().day == 16)) {
+    if (await hasInternetConnection()) {
       final url = Uri.parse("https://stage-cash.fesf-it.com/api/expense-heads");
       final token = prefs.getString('auth_token') ?? '';
+      if (token.isEmpty) {
+        showSnackBar(context, 'No authentication token found. Please log in again.');
+        return {'expenseHeads': expenseHeads, 'selectedHead': selectedHead};
+      }
+
       try {
         final response = await http.get(
           url,
@@ -127,7 +146,7 @@ class Utils {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
-        );
+        ).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(response.body))
               .map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']})
@@ -137,8 +156,15 @@ class Utils {
           }
           selectedHead = expenseHeads.isNotEmpty ? expenseHeads[0]['name'] : 'General';
           await prefs.setString('expense_heads', jsonEncode(expenseHeads));
+        } else if (response.statusCode == 401) {
+          showSnackBar(context, 'Authentication failed. Please log in again.');
+          await clearAuthPrefs();
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+          );
         } else {
-          showSnackBar(context, 'Failed to load expense heads: ${response.statusCode}');
+          showSnackBar(context, 'Failed to load expense heads: HTTP ${response.statusCode}');
         }
       } catch (e) {
         showSnackBar(context, 'Error loading expense heads: $e');
@@ -238,7 +264,7 @@ class Utils {
         return List<Map<String, dynamic>>.from(json.decode(jsonString));
       }
     } catch (e) {
-      print('Error loading bills: $e');
+      // Handle error silently or log
     }
     return [];
   }
@@ -250,7 +276,7 @@ class Utils {
       final file = File('${directory.path}/$fileName');
       await file.writeAsString(json.encode(bills));
     } catch (e) {
-      print('Error saving bills: $e');
+      // Handle error silently or log
     }
   }
 
@@ -297,10 +323,19 @@ class Utils {
   }
 
   static Future<double?> fetchBalance(BuildContext context) async {
+    if (!await hasInternetConnection()) {
+      showSnackBar(context, 'No internet connection. Cannot fetch balance.');
+      return null;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
     if (token.isEmpty) {
-      print('No auth token found in shared_preferences.');
+      showSnackBar(context, 'No authentication token found. Please log in again.');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
       return null;
     }
 
@@ -312,31 +347,59 @@ class Utils {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
-        return (jsonDecode(response.body)['current_balance'] as num?)?.toDouble() ?? 0.0;
+        return double.tryParse(jsonDecode(response.body)['balance'].toString()) ?? 0.0;
+      } else if (response.statusCode == 401) {
+        showSnackBar(context, 'Authentication failed. Please log in again.');
+        await clearAuthPrefs();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
       } else {
-        showSnackBar(context, 'Failed to refresh balance: ${response.statusCode}');
-        return null;
+        showSnackBar(context, 'Failed to fetch balance: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      showSnackBar(context, 'Error refreshing balance: $e');
-      return null;
+      showSnackBar(context, 'Error fetching balance: $e');
     }
+    return null;
+  }
+
+  static Map<String, dynamic> getSemiMonthlyPeriod() {
+    final now = DateTime.now();
+    late DateTime startDate, endDate;
+    if (now.day <= 15) {
+      startDate = DateTime(now.year, now.month, 1);
+      endDate = DateTime(now.year, now.month, 15);
+    } else {
+      startDate = DateTime(now.year, now.month, 16);
+      endDate = DateTime(now.year, now.month + 1, 0);
+    }
+    final dateFormat = DateFormat('dd-MMM-yy');
+    return {
+      'period': '${dateFormat.format(startDate)} to ${dateFormat.format(endDate)}',
+      'start_date': dateFormat.format(startDate),
+      'end_date': dateFormat.format(endDate),
+      'openingBalance': 0.0,
+    };
   }
 
   static Future<Map<String, dynamic>> fetchReportingPeriod(BuildContext context) async {
+    if (!await hasInternetConnection()) {
+      showSnackBar(context, 'No internet connection. Using default semi-monthly period.');
+      return getSemiMonthlyPeriod();
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
     if (token.isEmpty) {
-      print('No auth token found in shared_preferences.');
-      return {
-        'period': 'No auth token',
-        'openingBalance': null,
-        'formattedStartDate': 'N/A',
-        'start_date': null,
-        'end_date': null,
-      };
+      showSnackBar(context, 'No authentication token found. Please log in again.');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+      );
+      return getSemiMonthlyPeriod();
     }
 
     final url = Uri.parse('https://stage-cash.fesf-it.com/api/reporting-period');
@@ -347,39 +410,29 @@ class Utils {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final periodData = data['active_reporting_period'];
-        final startDate = periodData['start_date'];
-        final endDate = periodData['end_date'];
         return {
-          'period': periodData['name'] ?? 'Unknown Period',
-          'openingBalance': (periodData['pivot']['opening_balance'] as num?)?.toDouble() ?? 0.0,
-          'formattedStartDate': startDate ?? 'N/A',
-          'start_date': startDate,
-          'end_date': endDate,
+          'period': '${data['start_date']} to ${data['end_date']}',
+          'start_date': data['start_date'],
+          'end_date': data['end_date'],
+          'openingBalance': double.tryParse(data['opening_balance'].toString()) ?? 0.0,
         };
+      } else if (response.statusCode == 401) {
+        showSnackBar(context, 'Authentication failed. Please log in again.');
+        await clearAuthPrefs();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
       } else {
-        showSnackBar(context, 'Failed to load reporting period: ${response.statusCode}');
-        return {
-          'period': 'Failed to load: HTTP ${response.statusCode}',
-          'openingBalance': null,
-          'formattedStartDate': 'N/A',
-          'start_date': null,
-          'end_date': null,
-        };
+        showSnackBar(context, 'Failed to fetch reporting period: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      showSnackBar(context, 'Error loading reporting period: $e');
-      return {
-        'period': 'Error: $e',
-        'openingBalance': null,
-        'formattedStartDate': 'N/A',
-        'start_date': null,
-        'end_date': null,
-      };
+      showSnackBar(context, 'Error fetching reporting period: $e');
     }
+    return getSemiMonthlyPeriod();
   }
 
   static void showBillDetails(BuildContext context, Map<String, dynamic> bill) {
@@ -394,20 +447,19 @@ class Utils {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          'Bill Details',
+          bill['narration'] ?? '',
           style: GoogleFonts.montserrat(
-              fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500)),
+              fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500),
+        ),
         content: SingleChildScrollView(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Date: $formattedDate',
                   style: GoogleFonts.montserrat(
                       fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
               Text('Expense Head: ${bill['expenseHead'] ?? 'General'}',
-                  style: GoogleFonts.montserrat(
-                      fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
-              Text('Narration: ${bill['narration'] ?? ''}',
                   style: GoogleFonts.montserrat(
                       fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
               Text('Amount: Rs. ${NumberFormat('#,###').format(bill['amount'].round())}',
@@ -639,7 +691,8 @@ class Utils {
                         children: [
                           GestureDetector(
                             onLongPress: () {
-                              bill['attached'] = !isAttached;
+                              isAttached = !isAttached;
+                              bill['attached'] = isAttached;
                             },
                             child: Container(
                               color: isAttached ? Colors.green : Colors.red,

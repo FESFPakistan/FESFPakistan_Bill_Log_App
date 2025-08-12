@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import '../pages/bill_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'bill_screen.dart';
 import '../utils.dart';
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -35,6 +34,30 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  Future<void> _saveUserData(Map<String, dynamic> user, String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('name', user['name']);
+    await prefs.setString('locationCode', user['location']['code']);
+    await prefs.setString('auth_token', token);
+    await prefs.setInt('user_id', user['id']);
+    await prefs.setString('email', user['email']);
+    await prefs.setInt('location_id', user['location']['id']);
+    await prefs.setString('location_name', user['location']['name']);
+  }
+
+  Future<void> _handleRememberMe(String email, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setString('saved_email', email);
+      await prefs.setString('saved_password', password);
+      await prefs.setBool('remember_me', true);
+    } else {
+      await prefs.remove('saved_email');
+      await prefs.remove('saved_password');
+      await prefs.remove('remember_me');
+    }
+  }
+
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -53,34 +76,21 @@ class _LoginPageState extends State<LoginPage> {
           final data = jsonDecode(response.body)['data'];
           final user = data['user'];
           final token = data['token'];
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('name', user['name']);
-          await prefs.setString('locationCode', user['location']['code']);
-          await prefs.setString('auth_token', token);
-          await prefs.setInt('user_id', user['id']);
-          await prefs.setString('email', user['email']);
-          await prefs.setInt('location_id', user['location']['id']);
-          await prefs.setString('location_name', user['location']['name']);
 
-          if (_rememberMe) {
-            await prefs.setString('saved_email', email);
-            await prefs.setString('saved_password', password);
-            await prefs.setBool('remember_me', true);
-          } else {
-            await prefs.remove('saved_email');
-            await prefs.remove('saved_password');
-            await prefs.remove('remember_me');
-          }
+          await _saveUserData(user, token);
+          await _handleRememberMe(email, password);
 
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BillScreen(
-                name: user['name'],
-                locationCode: user['location']['code'],
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BillScreen(
+                  name: user['name'],
+                  locationCode: user['location']['code'],
+                ),
               ),
-            ),
-          );
+            );
+          }
         } else {
           Utils.showSnackBar(context, jsonDecode(response.body)['message'] ?? "Login failed");
         }
