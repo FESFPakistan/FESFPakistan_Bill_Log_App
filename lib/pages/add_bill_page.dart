@@ -142,7 +142,7 @@ class _AddBillPageState extends State<AddBillPage> {
         Utils.showSnackBar(context, 'Bill will be saved locally due to reporting period issue.');
       }
 
-      Navigator.pop(context, {
+      Navigator.pop(context, { 
         'narration': _narrationController.text,
         'amount': double.tryParse(_amountController.text) ?? 0.0,
         'expenseHead': _expenseHead,
