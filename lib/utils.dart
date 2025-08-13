@@ -9,7 +9,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'pages/login_page.dart';
 
 class Utils {
   static double getResponsiveFontSize(BuildContext context, double baseFontSize) {
@@ -67,7 +66,7 @@ class Utils {
   }
 
   static Widget buildElevatedButton({
-    required VoidCallback? onPressed,
+    required VoidCallback onPressed,
     required String label,
     required BuildContext context,
     double fontSize = 14.0,
@@ -90,7 +89,7 @@ class Utils {
     );
   }
 
-  static void showSnackBar(BuildContext context, String message) {
+  static Future<void> showSnackBar(BuildContext context, String message) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -103,78 +102,9 @@ class Utils {
 
   static Future<bool> hasInternetConnection() async {
     final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.none) {
-      return false;
-    }
-    try {
-      final result = await InternetAddress.lookup('8.8.8.8').timeout(const Duration(seconds: 5));
-      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
+    return connectivityResult != ConnectivityResult.none;
   }
 
-  static Future<Map<String, dynamic>> loadExpenseHeads(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final cachedExpenseHeads = prefs.getString('expense_heads');
-    List<Map<String, dynamic>> expenseHeads = [
-      {'id': 0, 'name': 'General', 'code': 'GENERAL'}
-    ];
-    String selectedHead = 'General';
-
-    if (cachedExpenseHeads != null) {
-      try {
-        expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
-        selectedHead = expenseHeads.isNotEmpty ? expenseHeads[0]['name'] : 'General';
-      } catch (e) {
-        showSnackBar(context, 'Error reading cached expense heads. Using default.');
-      }
-    }
-
-    if (await hasInternetConnection()) {
-      final url = Uri.parse("https://stage-cash.fesf-it.com/api/expense-heads");
-      final token = prefs.getString('auth_token') ?? '';
-      if (token.isEmpty) {
-        showSnackBar(context, 'No authentication token found. Please log in again.');
-        return {'expenseHeads': expenseHeads, 'selectedHead': selectedHead};
-      }
-
-      try {
-        final response = await http.get(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(response.body))
-              .map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']})
-              .toList();
-          if (!expenseHeads.any((head) => head['name'] == 'General')) {
-            expenseHeads.insert(0, {'id': 0, 'name': 'General', 'code': 'GENERAL'});
-          }
-          selectedHead = expenseHeads.isNotEmpty ? expenseHeads[0]['name'] : 'General';
-          await prefs.setString('expense_heads', jsonEncode(expenseHeads));
-        } else if (response.statusCode == 401) {
-          showSnackBar(context, 'Authentication failed. Please log in again.');
-          await clearAuthPrefs();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-          );
-        } else {
-          showSnackBar(context, 'Failed to load expense heads: HTTP ${response.statusCode}');
-        }
-      } catch (e) {
-        showSnackBar(context, 'Error loading expense heads: $e');
-      }
-    } else if (cachedExpenseHeads == null) {
-      showSnackBar(context, 'No internet connection. Using default expense head.');
-    }
-
-    return {'expenseHeads': expenseHeads, 'selectedHead': selectedHead};
-  }
 
   static Future<CroppedFile?> pickAndCropImage(BuildContext context) async {
     final picker = ImagePicker();
@@ -264,7 +194,7 @@ class Utils {
         return List<Map<String, dynamic>>.from(json.decode(jsonString));
       }
     } catch (e) {
-      // Handle error silently or log
+      print('Error loading bills: $e');
     }
     return [];
   }
@@ -276,7 +206,7 @@ class Utils {
       final file = File('${directory.path}/$fileName');
       await file.writeAsString(json.encode(bills));
     } catch (e) {
-      // Handle error silently or log
+      print('Error saving bills: $e');
     }
   }
 
@@ -323,19 +253,10 @@ class Utils {
   }
 
   static Future<double?> fetchBalance(BuildContext context) async {
-    if (!await hasInternetConnection()) {
-      showSnackBar(context, 'No internet connection. Cannot fetch balance.');
-      return null;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
     if (token.isEmpty) {
-      showSnackBar(context, 'No authentication token found. Please log in again.');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      print('No auth token found in shared_preferences.');
       return null;
     }
 
@@ -347,59 +268,34 @@ class Utils {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      ).timeout(const Duration(seconds: 10));
+      );
+
+      Utils.debugPrintApiResponse('fetchBalance', response);
+
       if (response.statusCode == 200) {
-        return double.tryParse(jsonDecode(response.body)['balance'].toString()) ?? 0.0;
-      } else if (response.statusCode == 401) {
-        showSnackBar(context, 'Authentication failed. Please log in again.');
-        await clearAuthPrefs();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
+        return (jsonDecode(response.body)['current_balance'] as num?)?.toDouble() ?? 0.0;
       } else {
-        showSnackBar(context, 'Failed to fetch balance: HTTP ${response.statusCode}');
+        showSnackBar(context, 'Failed to refresh balance: ${response.statusCode}');
+        return null;
       }
     } catch (e) {
-      showSnackBar(context, 'Error fetching balance: $e');
+      showSnackBar(context, 'Error refreshing balance: $e');
+      return null;
     }
-    return null;
-  }
-
-  static Map<String, dynamic> getSemiMonthlyPeriod() {
-    final now = DateTime.now();
-    late DateTime startDate, endDate;
-    if (now.day <= 15) {
-      startDate = DateTime(now.year, now.month, 1);
-      endDate = DateTime(now.year, now.month, 15);
-    } else {
-      startDate = DateTime(now.year, now.month, 16);
-      endDate = DateTime(now.year, now.month + 1, 0);
-    }
-    final dateFormat = DateFormat('dd-MMM-yy');
-    return {
-      'period': '${dateFormat.format(startDate)} to ${dateFormat.format(endDate)}',
-      'start_date': dateFormat.format(startDate),
-      'end_date': dateFormat.format(endDate),
-      'openingBalance': 0.0,
-    };
   }
 
   static Future<Map<String, dynamic>> fetchReportingPeriod(BuildContext context) async {
-    if (!await hasInternetConnection()) {
-      showSnackBar(context, 'No internet connection. Using default semi-monthly period.');
-      return getSemiMonthlyPeriod();
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
     if (token.isEmpty) {
-      showSnackBar(context, 'No authentication token found. Please log in again.');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
-      return getSemiMonthlyPeriod();
+      print('No auth token found in shared_preferences.');
+      return {
+        'period': 'No auth token',
+        'openingBalance': null,
+        'formattedStartDate': 'N/A',
+        'start_date': null,
+        'end_date': null,
+      };
     }
 
     final url = Uri.parse('https://stage-cash.fesf-it.com/api/reporting-period');
@@ -410,29 +306,41 @@ class Utils {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      ).timeout(const Duration(seconds: 10));
+      );
+      Utils.debugPrintApiResponse('fetchReportingPeriod', response);
+       // --- IGNORE ---
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final periodData = data['active_reporting_period'];
+        final startDate = periodData['start_date'];
+        final endDate = periodData['end_date'];
         return {
-          'period': '${data['start_date']} to ${data['end_date']}',
-          'start_date': data['start_date'],
-          'end_date': data['end_date'],
-          'openingBalance': double.tryParse(data['opening_balance'].toString()) ?? 0.0,
+          'period': periodData['name'] ?? 'Unknown Period',
+          'openingBalance': (periodData['pivot']['opening_balance'] as num?)?.toDouble() ?? 0.0,
+          'formattedStartDate': startDate ?? 'N/A',
+          'start_date': startDate,
+          'end_date': endDate,
         };
-      } else if (response.statusCode == 401) {
-        showSnackBar(context, 'Authentication failed. Please log in again.');
-        await clearAuthPrefs();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
       } else {
-        showSnackBar(context, 'Failed to fetch reporting period: HTTP ${response.statusCode}');
+        showSnackBar(context, 'Failed to load reporting period: ${response.statusCode}');
+        return {
+          'period': 'Failed to load: HTTP ${response.statusCode}',
+          'openingBalance': null,
+          'formattedStartDate': 'N/A',
+          'start_date': null,
+          'end_date': null,
+        };
       }
     } catch (e) {
-      showSnackBar(context, 'Error fetching reporting period: $e');
+      showSnackBar(context, 'Error loading reporting period: $e');
+      return {
+        'period': 'Error: $e',
+        'openingBalance': null,
+        'formattedStartDate': 'N/A',
+        'start_date': null,
+        'end_date': null,
+      };
     }
-    return getSemiMonthlyPeriod();
   }
 
   static void showBillDetails(BuildContext context, Map<String, dynamic> bill) {
@@ -447,19 +355,20 @@ class Utils {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          bill['narration'] ?? '',
+          'Bill Details',
           style: GoogleFonts.montserrat(
-              fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500),
-        ),
+              fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500)),
         content: SingleChildScrollView(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Date: $formattedDate',
                   style: GoogleFonts.montserrat(
                       fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
-              Text('Expense Head: ${bill['expenseHead'] ?? 'General'}',
+              Text('Expense Head: ${bill['expenseHead'] ?? 'NA'}',
+                  style: GoogleFonts.montserrat(
+                      fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
+              Text('Narration: ${bill['narration'] ?? ''}',
                   style: GoogleFonts.montserrat(
                       fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500)),
               Text('Amount: Rs. ${NumberFormat('#,###').format(bill['amount'].round())}',
@@ -548,91 +457,6 @@ class Utils {
       ),
     );
   }
-
-  static Widget buildBalanceAndPeriodCard(
-      BuildContext context, String period, bool isLoading, String? openingBalance,
-      {VoidCallback? onRefresh}) {
-    return Card(
-      elevation: 2.0,
-      margin: const EdgeInsets.only(bottom: 16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Opening Balance',
-                  style: GoogleFonts.montserrat(
-                      fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4.0),
-                Text(
-                  'Financial Period',
-                  style: GoogleFonts.montserrat(
-                      fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                if (isLoading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.0),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        openingBalance ?? 'N/A',
-                        style: GoogleFonts.montserrat(
-                            fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 4.0),
-                      Container(
-                        constraints: const BoxConstraints(maxWidth: 200),
-                        child: Text(
-                          period,
-                          style: GoogleFonts.montserrat(
-                            fontSize: getResponsiveFontSize(context, 14.0),
-                            fontWeight: FontWeight.w500,
-                            color: period.contains('Error') ||
-                                    period.contains('Failed') ||
-                                    period.contains('HTTP') ||
-                                    period.contains('Exception') ||
-                                    period.contains('No auth') ||
-                                    period.contains('No internet')
-                                ? Colors.red
-                                : const Color.fromARGB(255, 7, 1, 17),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                          textAlign: TextAlign.end,
-                        ),
-                      ),
-                    ],
-                  ),
-                if (onRefresh != null) ...[
-                  const SizedBox(width: 8.0),
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: onRefresh,
-                    iconSize: 18,
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   static Widget buildBillCard(
       BuildContext context,
       Map<String, dynamic> bill,
@@ -675,12 +499,12 @@ class Utils {
                           style: GoogleFonts.montserrat(
                               fontSize: getResponsiveFontSize(context, 12.0),
                               fontWeight: FontWeight.w500)),
-                      Text('Exp: ${bill['expenseHead'] ?? 'General'}',
+                      Text('Exp: ${bill['expenseHead']}',
                           style: GoogleFonts.montserrat(
                               fontSize: getResponsiveFontSize(context, 10.0),
                               fontWeight: FontWeight.w400)),
                       Text(
-                        bill['narration'] ?? '',
+                        bill['narration'],
                         style: GoogleFonts.montserrat(
                             fontSize: getResponsiveFontSize(context, 10.0),
                             fontWeight: FontWeight.w400),
@@ -691,8 +515,7 @@ class Utils {
                         children: [
                           GestureDetector(
                             onLongPress: () {
-                              isAttached = !isAttached;
-                              bill['attached'] = isAttached;
+                              bill['attached'] = !isAttached;
                             },
                             child: Container(
                               color: isAttached ? Colors.green : Colors.red,
@@ -745,7 +568,163 @@ class Utils {
       ),
     );
   }
+  // Add this method to your Utils class
+static Widget buildBalanceAndPeriodCard(
+    BuildContext context, 
+    String period, 
+    bool isLoading, 
+    String? openingBalance,
+    {VoidCallback? onRefresh}
+) {
+  return Card(
+    elevation: 2.0,
+    margin: const EdgeInsets.only(bottom: 16.0),
+    child: Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Opening Balance',
+                style: GoogleFonts.montserrat(
+                    fontSize: getResponsiveFontSize(context, 14.0), 
+                    fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 4.0),
+              Text(
+                'Financial Period',
+                style: GoogleFonts.montserrat(
+                    fontSize: getResponsiveFontSize(context, 14.0), 
+                    fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              if (isLoading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.0),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      openingBalance ?? 'N/A',
+                      style: GoogleFonts.montserrat(
+                          fontSize: getResponsiveFontSize(context, 14.0), 
+                          fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4.0),
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        period,
+                        style: GoogleFonts.montserrat(
+                          fontSize: getResponsiveFontSize(context, 14.0),
+                          fontWeight: FontWeight.w500,
+                          color: period.contains('Error') ||
+                                  period.contains('Failed') ||
+                                  period.contains('HTTP') ||
+                                  period.contains('Exception') ||
+                                  period.contains('No auth') ||
+                                  period.contains('No internet')
+                              ? Colors.red
+                              : const Color.fromARGB(255, 7, 1, 17),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                  ],
+                ),
+              if (onRefresh != null) ...[
+                const SizedBox(width: 8.0),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: onRefresh,
+                  iconSize: 18,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+static Future<Map<String, dynamic>> loadExpenseHeads(BuildContext context) async {
+  final prefs = await SharedPreferences.getInstance();
+  final cachedExpenseHeads = prefs.getString('expense_heads');
+  List<Map<String, dynamic>> expenseHeads = [];
+  String? selectedHead;
 
+  if (cachedExpenseHeads != null) {
+    expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
+    if (expenseHeads.isNotEmpty) {
+      selectedHead = expenseHeads[0]['name'];
+    }
+  }
+
+  if (await hasInternetConnection() && (DateTime.now().day == 1 || DateTime.now().day == 16)) {
+    final url = Uri.parse("https://stage-cash.fesf-it.com/api/expense-heads");
+    final token = prefs.getString('auth_token') ?? '';
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      Utils.debugPrintApiResponse('loadExpenseHeads', response);
+      if (response.statusCode == 200) {
+        expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(response.body))
+            .map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']})
+            .toList();
+        if (expenseHeads.isNotEmpty) {
+          selectedHead = expenseHeads[0]['name'];
+        }
+        await prefs.setString('expense_heads', jsonEncode(expenseHeads));
+      } else {
+        showSnackBar(context, 'Failed to load expense heads: ${response.statusCode}');
+      }
+    } catch (e) {
+      showSnackBar(context, 'Error loading expense heads: $e');
+    }
+  } else if (cachedExpenseHeads == null) {
+    showSnackBar(context, 'No internet connection. Expense heads not available.');
+  }
+
+  return {'expenseHeads': expenseHeads, 'selectedHead': selectedHead};
+}
+static void debugPrintApiResponse(String apiName, http.Response response) {
+  debugPrint('');
+  debugPrint('');
+  debugPrint('=== API Response Debug ===');
+  debugPrint('API: $apiName');
+  debugPrint('Status Code: ${response.statusCode}');
+  debugPrint('Headers: ${response.headers}');
+  debugPrint('Body: ${response.body}');
+
+  try {
+    final jsonResponse = jsonDecode(response.body);
+    final prettyJson = JsonEncoder.withIndent('  ').convert(jsonResponse);
+    debugPrint('Body:\n$prettyJson');
+  } catch (e) {
+    debugPrint('Body: ${response.body}');
+  }
+  
+  debugPrint('==========================\n\n');
+  debugPrint('');
+  debugPrint('');
+}
   static String get currentDateTime =>
       DateFormat('dd-MMM-yyyy', 'en_US').format(DateTime.now());
 }

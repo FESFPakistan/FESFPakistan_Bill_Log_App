@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import '../utils.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AddBillPage extends StatefulWidget {
   const AddBillPage({super.key});
@@ -19,136 +25,217 @@ class _AddBillPageState extends State<AddBillPage> {
   DateTime _selectedDate = DateTime.now();
   String? _imagePath;
   List<Map<String, dynamic>> _expenseHeads = [];
-  Map<String, dynamic>? _reportingPeriod;
-  bool _isLoadingExpenseHeads = true;
 
   @override
   void initState() {
     super.initState();
     _loadExpenseHeads();
-    _loadReportingPeriod();
+  }
+
+  Future<bool> _hasInternetConnection() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
+  bool _shouldFetchExpenseHeads() {
+    final now = DateTime.now();
+    final isFirstOrSixteenth = now.day == 1 || now.day == 16;
+    return isFirstOrSixteenth;
   }
 
   Future<void> _loadExpenseHeads() async {
-    final result = await Utils.loadExpenseHeads(context);
-    if (mounted) {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedExpenseHeads = prefs.getString('expense_heads');
+
+    if (cachedExpenseHeads != null) {
       setState(() {
-        _expenseHeads = result['expenseHeads'];
-        _expenseHead = result['selectedHead'];
-        _isLoadingExpenseHeads = false;
+        _expenseHeads = List<Map<String, dynamic>>.from(jsonDecode(cachedExpenseHeads));
+        if (_expenseHeads.isNotEmpty) {
+          _expenseHead = _expenseHeads[0]['name'];
+        }
       });
+    } else if (await _hasInternetConnection()) {
+      await _fetchExpenseHeads();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No internet connection. Expense heads not available.',
+            style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+          ),
+        ),
+      );
+      setState(() {
+        _expenseHeads = [];
+        _expenseHead = null;
+      });
+    }
+
+    if (await _hasInternetConnection() && _shouldFetchExpenseHeads()) {
+      await _fetchExpenseHeads();
     }
   }
 
-  Future<void> _loadReportingPeriod() async {
-    final result = await Utils.fetchReportingPeriod(context);
-    if (mounted) {
-      setState(() {
-        _reportingPeriod = result;
-      });
+  Future<void> _fetchExpenseHeads() async {
+    final url = Uri.parse("https://stage-cash.fesf-it.com/api/expense-heads");
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        setState(() {
+          _expenseHeads = data.map((item) => {'id': item['id'], 'name': item['name'], 'code': item['code']}).toList();
+          if (_expenseHeads.isNotEmpty) {
+            _expenseHead = _expenseHeads[0]['name'];
+          }
+        });
+        await prefs.setString('expense_heads', jsonEncode(_expenseHeads));
+      } else {
+        throw Exception('Failed to load expense heads: ${response.statusCode}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error loading expense heads: $e',
+            style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await Utils.pickAndCropImage(context);
-    if (pickedFile != null && mounted) {
-      setState(() {
-        _imagePath = pickedFile.path;
-      });
-    }
-  }
+    final picker = ImagePicker();
+    String? sourcePath;
 
-  Future<DateTime> _determineInitialDate(DateTime firstDate, DateTime lastDate) async {
-    DateTime initialDate = _selectedDate;
-    if (initialDate.isBefore(firstDate) || initialDate.isAfter(lastDate)) {
-      initialDate = firstDate;
-    }
-    return initialDate;
-  }
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (BuildContext context) {
+        return SimpleDialog(
+          title: Text(
+            'Select Image Source',
+            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 16.0), fontWeight: FontWeight.w500),
+          ),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, ImageSource.gallery),
+              child: Text(
+                'Gallery',
+                style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+              ),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, ImageSource.camera),
+              child: Text(
+                'Camera',
+                style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+              ),
+            ),
+          ],
+        );
+      },
+    );
 
-  Future<Map<String, dynamic>> _getDateRange() async {
-    final reportingPeriod = _reportingPeriod ?? await Utils.fetchReportingPeriod(context);
-    final dateFormat = DateFormat('dd-MMM-yy');
-    DateTime firstDate = DateTime.now();
-    DateTime lastDate = DateTime.now();
-
-    if (reportingPeriod['period'] != null && !reportingPeriod['period'].contains('Error')) {
-      try {
-        final startDateStr = reportingPeriod['start_date'] as String?;
-        final endDateStr = reportingPeriod['end_date'] as String?;
-        if (startDateStr != null && endDateStr != null) {
-          firstDate = dateFormat.parse(startDateStr);
-          lastDate = dateFormat.parse(endDateStr);
-        } else {
-          throw Exception('Invalid reporting period dates');
-        }
-      } catch (e) {
-        Utils.showSnackBar(context, 'Error parsing reporting period dates. Using default semi-monthly period.');
-        final semiPeriod = Utils.getSemiMonthlyPeriod();
-        firstDate = dateFormat.parse(semiPeriod['start_date']);
-        lastDate = dateFormat.parse(semiPeriod['end_date']);
-      }
-    } else {
-      final semiPeriod = Utils.getSemiMonthlyPeriod();
-      firstDate = dateFormat.parse(semiPeriod['start_date']);
-      lastDate = dateFormat.parse(semiPeriod['end_date']);
-      if (reportingPeriod['period']?.contains('Error') != true) {
-        Utils.showSnackBar(context, 'Using default semi-monthly period for date selection.');
+    if (source != null) {
+      final pickedFile = await picker.pickImage(source: source);
+      if (pickedFile != null) {
+        sourcePath = pickedFile.path;
       }
     }
 
-    return {'firstDate': firstDate, 'lastDate': lastDate};
+    if (sourcePath != null) {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: sourcePath,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 80,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Edit Image',
+            toolbarColor: Colors.deepPurple,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: false,
+          ),
+          IOSUiSettings(
+            title: 'Edit Image',
+            rotateButtonsHidden: false,
+            rotateClockwiseButtonHidden: false,
+          ),
+        ],
+      );
+
+      if (croppedFile != null) {
+        setState(() {
+          _imagePath = croppedFile.path;
+        });
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final dateRange = await _getDateRange();
-    final firstDate = dateRange['firstDate'];
-    final lastDate = dateRange['lastDate'];
-    final initialDate = await _determineInitialDate(firstDate, lastDate);
+    final now = DateTime.now();
+    final currentMonth = now.month;
+    final currentYear = now.year;
+    final currentDay = now.day;
 
-    final picked = await Utils.selectDate(context, initialDate, firstDate, lastDate);
-    if (picked != null && picked != _selectedDate && mounted) {
+    DateTime firstAllowedDate;
+    DateTime lastAllowedDate;
+
+    if (currentDay > 15) {
+      firstAllowedDate = DateTime(currentYear, currentMonth, 1);
+      lastAllowedDate = now;
+    } else {
+      final prevMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+      final prevYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+      firstAllowedDate = DateTime(prevYear, prevMonth, 16);
+      lastAllowedDate = now;
+    }
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: firstAllowedDate,
+      lastDate: lastAllowedDate,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: Colors.deepPurple,
+            colorScheme: const ColorScheme.light(primary: Colors.deepPurple),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            textTheme: TextTheme(
+              bodyLarge: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
       });
     }
   }
 
-  bool _isDateInRange(DateTime date, DateTime firstDate, DateTime lastDate) {
-    return !date.isBefore(firstDate) && !date.isAfter(lastDate);
-  }
-
   void _submitForm() {
-    if (_expenseHeads.isEmpty) {
-      Utils.showSnackBar(context, 'Cannot submit bill: No expense heads available.');
-      return;
-    }
-    if (_formKey.currentState!.validate()) {
-      if (_imagePath == null) {
-        Utils.showSnackBar(context, 'Please pick an image');
-        return;
-      }
-
-      if (_reportingPeriod == null || _reportingPeriod!['period'] == null || _reportingPeriod!['period'].contains('Error')) {
-        final semiPeriod = Utils.getSemiMonthlyPeriod();
-        final dateFormat = DateFormat('dd-MMM-yy');
-        final firstDate = dateFormat.parse(semiPeriod['start_date']);
-        final lastDate = dateFormat.parse(semiPeriod['end_date']);
-
-        if (!_isDateInRange(_selectedDate, firstDate, lastDate)) {
-          Utils.showSnackBar(context, 'Selected date is outside the current semi-monthly period');
-          return;
-        }
-        Utils.showSnackBar(context, 'Bill will be saved locally due to reporting period issue.');
-      }
-
-      Navigator.pop(context, { 
+    if (_formKey.currentState != null && _formKey.currentState!.validate()) {
+      final result = {
         'narration': _narrationController.text,
         'amount': double.tryParse(_amountController.text) ?? 0.0,
         'expenseHead': _expenseHead,
         'date': _selectedDate,
         'imagePath': _imagePath,
-      });
+      };
+      Navigator.pop(context, result);
     }
   }
 
@@ -165,9 +252,7 @@ class _AddBillPageState extends State<AddBillPage> {
       appBar: AppBar(
         title: Text(
           'Add Bill',
-          style: GoogleFonts.montserrat(
-              fontSize: Utils.getResponsiveFontSize(context, 18.0),
-              fontWeight: FontWeight.w600),
+          style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 18.0), fontWeight: FontWeight.w600),
         ),
       ),
       body: Padding(
@@ -176,56 +261,59 @@ class _AddBillPageState extends State<AddBillPage> {
           key: _formKey,
           child: ListView(
             children: [
-              Utils.buildTextFormField(
+              TextFormField(
                 controller: _narrationController,
-                label: 'Narration',
-                context: context,
+                decoration: InputDecoration(
+                  labelText: 'Narration',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 validator: (value) => value!.isEmpty ? 'Please enter narration' : null,
               ),
-              Utils.buildTextFormField(
+              TextFormField(
                 controller: _amountController,
-                label: 'Amount',
-                context: context,
+                decoration: InputDecoration(
+                  labelText: 'Amount',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
+                ),
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Please enter amount' : null,
               ),
-              _isLoadingExpenseHeads
-                  ? const Center(child: CircularProgressIndicator())
-                  : _expenseHeads.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Text(
-                            'No expense heads available.',
-                            style: GoogleFonts.montserrat(
-                                fontSize: Utils.getResponsiveFontSize(context, 14.0),
-                                fontWeight: FontWeight.w400,
-                                color: Colors.red),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : DropdownButtonFormField<String>(
-                          value: _expenseHead,
-                          decoration: Utils.inputDecoration(context, 'Expense Head'),
-                          items: _expenseHeads.map((head) {
-                            return DropdownMenuItem<String>(
-                              value: head['name'],
-                              child: Text(
-                                head['name'],
-                                style: GoogleFonts.montserrat(
-                                    fontSize: Utils.getResponsiveFontSize(context, 10.0),
-                                    fontWeight: FontWeight.w400),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) => setState(() => _expenseHead = value),
-                          validator: (value) => value == null ? 'Please select an expense head' : null,
+              DropdownButtonFormField<String>(
+                value: _expenseHead,
+                decoration: InputDecoration(
+                  labelText: 'Expense Head',
+                  labelStyle: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 13.0), fontWeight: FontWeight.w400),
+                ),
+                items: _expenseHeads.isEmpty
+                    ? [DropdownMenuItem<String>(
+                        value: null,
+                        child: Text(
+                          'No expense heads available',
+                          style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400),
                         ),
+                      )]
+                    : _expenseHeads.map((head) {
+                        return DropdownMenuItem<String>(
+                          value: head['name'],
+                          child: Text(
+                            head['name'],
+                            style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 10.0), fontWeight: FontWeight.w400),
+                          ),
+                        );
+                      }).toList(),
+                onChanged: _expenseHeads.isEmpty
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _expenseHead = value;
+                        });
+                      },
+                validator: (value) => value == null && _expenseHeads.isNotEmpty ? 'Please select an expense head' : null,
+              ),
               ListTile(
                 title: Text(
                   'Date: ${DateFormat('dd/MM/yy').format(_selectedDate)}',
-                  style: GoogleFonts.montserrat(
-                      fontSize: Utils.getResponsiveFontSize(context, 14.0),
-                      fontWeight: FontWeight.w400),
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w400),
                 ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () => _selectDate(context),
@@ -235,15 +323,31 @@ class _AddBillPageState extends State<AddBillPage> {
                   padding: const EdgeInsets.only(top: 16.0),
                   child: Image.file(File(_imagePath!), height: 100),
                 ),
-              Utils.buildElevatedButton(
+              ElevatedButton(
                 onPressed: _pickImage,
-                label: 'Pick Image',
-                context: context,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(150, 40),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Pick Image',
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                ),
               ),
-              Utils.buildElevatedButton(
-                onPressed: _expenseHeads.isEmpty || _isLoadingExpenseHeads ? null : _submitForm,
-                label: 'Submit',
-                context: context,
+              ElevatedButton(
+                onPressed: _submitForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(150, 40),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Submit',
+                  style: GoogleFonts.montserrat(fontSize: getResponsiveFontSize(context, 14.0), fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
