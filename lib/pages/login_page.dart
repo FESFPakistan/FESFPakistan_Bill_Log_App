@@ -45,7 +45,10 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = true);
         final response = await http.post(
           url,
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json',},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
           body: jsonEncode({'email': email, 'password': password}),
         );
 
@@ -56,12 +59,14 @@ class _LoginPageState extends State<LoginPage> {
           final token = data['token'];
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('name', user['name'] ?? '');
-          await prefs.setString('locationCode', user['location']?['code'] ?? '');
+          await prefs.setString(
+              'locationCode', user['location']?['code'] ?? '');
           await prefs.setString('auth_token', token ?? '');
           await prefs.setInt('user_id', user['id'] ?? 0);
           await prefs.setString('email', user['email'] ?? '');
           await prefs.setInt('location_id', user['location']?['id'] ?? 0);
-          await prefs.setString('location_name', user['location']?['name'] ?? '');
+          await prefs.setString(
+              'location_name', user['location']?['name'] ?? '');
 
           if (_rememberMe) {
             await prefs.setString('saved_email', email);
@@ -97,7 +102,8 @@ class _LoginPageState extends State<LoginPage> {
             SnackBar(
               content: Text(
                 errorMsg,
-                style: TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
+                style:
+                    TextStyle(fontSize: getResponsiveFontSize(context, 14.0)),
               ),
             ),
           );
@@ -130,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Login',
+          'FESF petty cash',
           style: GoogleFonts.montserrat(
             fontSize: getResponsiveFontSize(context, 18.0),
             fontWeight: FontWeight.w600,
@@ -154,8 +160,9 @@ class _LoginPageState extends State<LoginPage> {
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Please enter email' : null,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Please enter email'
+                    : null,
                 keyboardType: TextInputType.emailAddress,
               ),
               TextFormField(
@@ -168,8 +175,9 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 obscureText: true,
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Please enter password' : null,
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'Please enter password'
+                    : null,
               ),
               Row(
                 children: [
